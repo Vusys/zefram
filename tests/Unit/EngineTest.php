@@ -1,0 +1,233 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Vusys\Zefram\Tests\Unit;
+
+use PHPUnit\Framework\TestCase;
+use Vusys\Zefram\Attribute\NeverSkip;
+use Vusys\Zefram\Config;
+use Vusys\Zefram\Engine;
+use Vusys\Zefram\Hash\FileHasher;
+use Vusys\Zefram\Store\Store;
+use Vusys\Zefram\Tests\Support\FakeDriver;
+use Vusys\Zefram\Tests\Support\TempProject;
+
+final class EngineTest extends TestCase
+{
+    private const TEST_CLASS = 'App\\Tests\\WarpCoreTest';
+
+    private TempProject $project;
+
+    private FakeDriver $driver;
+
+    protected function setUp(): void
+    {
+        $this->project = new TempProject();
+        $this->project->write('src/WarpCore.php', '<?php class WarpCore {}');
+        $this->project->write('tests/WarpCoreTest.php', '<?php class WarpCoreTest {}');
+
+        $this->driver = new FakeDriver([
+            $this->project->path('src/WarpCore.php'),
+            $this->project->path('tests/WarpCoreTest.php'),
+            $this->project->path('vendor/laravel/framework/src/Foundation.php'),
+            '/usr/share/elsewhere/outside-root.php',
+        ]);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->project->destroy();
+    }
+
+    public function testFirstRunNeverSkips(): void
+    {
+        $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function testSkipsUnchangedTestThatPreviouslyPassed(): void
+    {
+        $this->runAndPass('testEngage');
+
+        $this->assertTrue($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function testRerunsWhenAnExecutedFileChanges(): void
+    {
+        $this->runAndPass('testEngage');
+
+        $this->project->write('src/WarpCore.php', '<?php class WarpCore { public int $dilithium = 9; }');
+
+        $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function testRerunsWhenAnExecutedFileIsDeleted(): void
+    {
+        $this->runAndPass('testEngage');
+
+        unlink($this->project->path('src/WarpCore.php'));
+
+        $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function testVendorAndOutsideRootFilesAreNotTracked(): void
+    {
+        $this->runAndPass('testEngage');
+
+        // vendor file never existed on disk and outside-root file is unreadable: if either
+        // were tracked, the hash check would fail and the test would not skip
+        $this->assertTrue($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function testFailureDropsTheRecord(): void
+    {
+        $this->runAndPass('testEngage');
+
+        $engine = $this->engine();
+        $this->assertTrue($engine->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+
+        $engine2 = $this->engine();
+        $engine2->startCapture(self::TEST_CLASS, 'testEngage', '');
+        $engine2->stopCapture();
+        $engine2->recordNotPassed(self::TEST_CLASS, 'testEngage', '');
+        $engine2->finish();
+
+        $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function testForeignSkipDropsTheRecordButSelfSkipKeepsIt(): void
+    {
+        $this->runAndPass('testEngage');
+
+        // self skip: shouldSkip() returned true, then the Skipped event arrives
+        $engine = $this->engine();
+        $this->assertTrue($engine->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+        $engine->recordSkipped(self::TEST_CLASS, 'testEngage', '');
+        $engine->finish();
+
+        $this->assertTrue($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''), 'self-skip must preserve the record');
+
+        // foreign skip: someone else's markTestSkipped, no shouldSkip() approval this run
+        $engine = $this->engine();
+        $engine->recordSkipped(self::TEST_CLASS, 'testEngage', '');
+        $engine->finish();
+
+        $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''), 'foreign skip must drop the record');
+    }
+
+    public function testDataSetsAreTrackedIndependently(): void
+    {
+        $this->runAndPass('testBeam', 'two to beam up');
+
+        $engine = $this->engine();
+
+        $this->assertTrue($engine->shouldSkip(self::TEST_CLASS, 'testBeam', 'two to beam up'));
+        $this->assertFalse($engine->shouldSkip(self::TEST_CLASS, 'testBeam', 'three to beam up'));
+        $this->assertFalse($engine->shouldSkip(self::TEST_CLASS, 'testBeam', 0));
+    }
+
+    public function testPassedWithoutCaptureStoresNothing(): void
+    {
+        $engine = $this->engine();
+        $engine->recordPassed(self::TEST_CLASS, 'testEngage', '');
+        $engine->finish();
+
+        $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function testOutcomeBeforeAfterHookClosesTheCaptureWindow(): void
+    {
+        // PHPUnit may emit Passed before the #[After] hook runs; recordPassed must close
+        // the still-open window itself rather than lose the capture
+        $engine = $this->engine();
+        $engine->shouldSkip(self::TEST_CLASS, 'testEngage', '');
+        $engine->startCapture(self::TEST_CLASS, 'testEngage', '');
+        $engine->recordPassed(self::TEST_CLASS, 'testEngage', '');
+        $engine->finish();
+
+        $this->assertSame(1, $this->driver->stops);
+        $this->assertTrue($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function testDisabledEngineNeverSkipsAndNeverCaptures(): void
+    {
+        $this->runAndPass('testEngage');
+
+        $engine = $this->engine(enabled: false);
+        $startsBefore = $this->driver->starts;
+
+        $this->assertFalse($engine->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+
+        $engine->startCapture(self::TEST_CLASS, 'testEngage', '');
+
+        $this->assertSame($startsBefore, $this->driver->starts);
+    }
+
+    public function testNeverSkipConfigPatternWins(): void
+    {
+        $this->runAndPass('testEngage');
+
+        $engine = $this->engine(neverSkip: ['App\\Tests\\WarpCoreTest::*']);
+
+        $this->assertFalse($engine->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function testNeverSkipAttributeWins(): void
+    {
+        $class = NeverSkipFixture::class;
+
+        $engine = $this->engine();
+        $engine->shouldSkip($class, 'testVolatile', '');
+        $engine->startCapture($class, 'testVolatile', '');
+        $engine->stopCapture();
+        $engine->recordPassed($class, 'testVolatile', '');
+        $engine->finish();
+
+        $this->assertFalse($this->engine()->shouldSkip($class, 'testVolatile', ''));
+    }
+
+    public function testSummaryReportsSkips(): void
+    {
+        $this->runAndPass('testEngage');
+
+        $engine = $this->engine();
+        $engine->shouldSkip(self::TEST_CLASS, 'testEngage', '');
+        $summary = $engine->finish();
+
+        $this->assertNotNull($summary);
+        $this->assertStringContainsString('skipped 1 of 1', $summary);
+    }
+
+    private function runAndPass(string $method, int|string $dataName = ''): void
+    {
+        $engine = $this->engine();
+
+        $this->assertFalse($engine->shouldSkip(self::TEST_CLASS, $method, $dataName));
+
+        $engine->startCapture(self::TEST_CLASS, $method, $dataName);
+        $engine->stopCapture();
+        $engine->recordPassed(self::TEST_CLASS, $method, $dataName);
+        $engine->finish();
+    }
+
+    /**
+     * @param list<string> $neverSkip
+     */
+    private function engine(bool $enabled = true, array $neverSkip = []): Engine
+    {
+        $config = new Config(
+            enabled: $enabled,
+            projectRoot: $this->project->root,
+            neverSkip: $neverSkip,
+        );
+
+        // fresh store + hasher per engine simulates a new process; fixed fingerprint keeps
+        // the cache namespace stable across the simulated runs
+        return new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher());
+    }
+}
+
+#[NeverSkip]
+final class NeverSkipFixture
+{
+}
