@@ -1,0 +1,46 @@
+# CodeRabbit PR review configuration.
+# https://docs.coderabbit.ai/reference/configuration
+
+language: en-US
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+  path_filters:
+    - "!vendor/**"
+    - "!.zefram/**"
+    - "!build/**"
+    - "!.phpunit.cache/**"
+    - "!composer.lock"
+  path_instructions:
+    - path: "src/**/*.php"
+      instructions: >
+        This is the runtime: correctness matters more than style here (PHPStan/Rector/Pint
+        already cover style). Flag anything that could weaken the invalidation model's
+        correctness guards documented in #20 — e.g. a skip decision that could survive a
+        failed/errored/risky/incomplete test, a shard write that isn't atomic, or code that
+        assumes a full-suite view where paratest only sees a partial one.
+    - path: "tests/**/*.php"
+      instructions: >
+        Prefer assertions on real, observable behavior (file contents, stored shard records,
+        child-process exit codes/output) over asserting against implementation details.
+        E2E tests intentionally spawn real child PHPUnit processes — that's expected, not a
+        smell.
+    - path: ".github/workflows/**/*.yml"
+      instructions: >
+        Every third-party action should be SHA-pinned with a trailing version comment.
+        Workflows should declare least-privilege `permissions:`. A job gated on repo
+        visibility (docs deploy, Scorecard) is intentionally dormant while this repo is
+        private — that's not a bug to flag.
+
+chat:
+  auto_reply: true
