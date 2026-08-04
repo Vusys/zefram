@@ -52,9 +52,12 @@
         "pint:check": "pint --test",
         "check": ["@pint:check", "@rector:check", "@analyse"],
         "test": "phpunit",
-        "test:e2e": "phpunit --testsuite e2e"
+        "test:e2e": "phpunit --testsuite e2e",
+        "infection": "infection --threads=max"
     },
     "require-dev": {
+        "infection/extension-installer": "^0.1.2",
+        "infection/infection": "^0.29 || ^0.33 || ^0.34",
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.30",
         "orchestra/testbench": "^9.12 || ^10.1 || ^11.0",

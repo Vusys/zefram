@@ -28,19 +28,23 @@ final readonly class Application
 
     /**
      * @param  list<string>  $argv  the full $argv, including the script name at index 0
+     * @param  resource  $stderr  injectable so tests can assert on the usage/error text
+     *                            without writing to the real process's STDERR — infection
+     *                            (see #44) treats any output on the real STDERR during its
+     *                            initial test run as fatal and aborts the whole run.
      */
-    public function run(array $argv): int
+    public function run(array $argv, mixed $stderr = STDERR): int
     {
         $name = $argv[1] ?? null;
 
         if ($name === null) {
-            fwrite(STDERR, $this->usage());
+            fwrite($stderr, $this->usage());
 
             return 1;
         }
 
         if (! isset($this->commands[$name])) {
-            fwrite(STDERR, "zefram: unknown command \"{$name}\"\n\n".$this->usage());
+            fwrite($stderr, "zefram: unknown command \"{$name}\"\n\n".$this->usage());
 
             return 1;
         }
