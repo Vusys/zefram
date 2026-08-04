@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Vusys\Zefram\Store;
 
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RuntimeException;
+use SplFileInfo;
 
 /**
  * One JSON shard per test class, loaded lazily, written atomically. Shards are
@@ -124,5 +128,42 @@ final class Store
     private function shardFile(string $class): string
     {
         return $this->directory . '/tests/' . hash('xxh128', $class) . '.json';
+    }
+
+    /**
+     * Deletes every fingerprint directory under $cacheRoot except $currentFingerprint's.
+     * Watched-path changes are folded into the fingerprint by design (see #20): any edit to
+     * a watched file spins up a brand-new fingerprint directory, and nothing else deletes
+     * the old one — left unaddressed, .zefram/ grows unboundedly over a normal development
+     * session. Caller must only invoke this on a full run (see Engine::isFullRun()) — a
+     * partial or parallel run must never delete a fingerprint directory another process
+     * might still be relying on.
+     */
+    public static function pruneSiblings(string $cacheRoot, string $currentFingerprint): void
+    {
+        foreach (glob(rtrim($cacheRoot, '/') . '/*', GLOB_ONLYDIR) ?: [] as $dir) {
+            if (basename($dir) !== $currentFingerprint) {
+                self::removeDirectory($dir);
+            }
+        }
+    }
+
+    private static function removeDirectory(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($iterator as $item) {
+            assert($item instanceof SplFileInfo);
+            $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
+        }
+
+        @rmdir($dir);
     }
 }

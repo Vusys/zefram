@@ -54,6 +54,7 @@ final class ZeframExtension implements Extension
             watchedPaths: $this->list($parameters, 'watchedPaths'),
             neverSkip: $this->list($parameters, 'neverSkip'),
             configurationFile: $this->configurationFile($configuration),
+            fullRun: $this->isFullRun($configuration),
         );
 
         $engine = Engine::create($config);
@@ -87,6 +88,39 @@ final class ZeframExtension implements Extension
         // would corrupt each other — and skipping tests would falsify the report anyway.
         if ($configuration->hasCoverageReport()) {
             return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Unfiltered, non-grouped, non-parallel: the only conditions safe to prune stale cache
+     * state under (#6, #7) — a partial or parallel run must never delete records/directories
+     * another process or a later un-filtered run might still need (see #20's storage-format
+     * section). hasFilter()/hasGroups()/hasExcludeGroups() are plain booleans in the PHPUnit
+     * versions this package supports, but guarded regardless in case a version in the ^11.5
+     * range throws from hasExcludeGroups() the way an older FilterNotConfigured-prone
+     * implementation did.
+     *
+     * TEST_TOKEN is paratest's per-worker marker (formalized as Engine::isParatestWorker()
+     * in #11); checked here too since a worker only ever sees a partial view of the suite.
+     */
+    private function isFullRun(Configuration $configuration): bool
+    {
+        if (getenv('TEST_TOKEN') !== false) {
+            return false;
+        }
+
+        if ($configuration->hasFilter() || $configuration->hasGroups()) {
+            return false;
+        }
+
+        try {
+            if ($configuration->hasExcludeGroups()) {
+                return false;
+            }
+        } catch (\Throwable) {
+            // no filter configuration at all: nothing excluded
         }
 
         return true;

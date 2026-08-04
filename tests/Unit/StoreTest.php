@@ -93,4 +93,43 @@ final class StoreTest extends TestCase
 
         $this->assertNull($reloaded->get('App\\Tests\\AlphaTest', 'testOne'));
     }
+
+    public function testPruneSiblingsDeletesEveryFingerprintDirectoryExceptTheCurrentOne(): void
+    {
+        $cacheRoot = $this->project->path('.zefram');
+        $this->populateShard($cacheRoot . '/current');
+        $this->populateShard($cacheRoot . '/stale-one');
+        $this->populateShard($cacheRoot . '/stale-two');
+
+        Store::pruneSiblings($cacheRoot, 'current');
+
+        $this->assertDirectoryExists($cacheRoot . '/current');
+        $this->assertDirectoryDoesNotExist($cacheRoot . '/stale-one');
+        $this->assertDirectoryDoesNotExist($cacheRoot . '/stale-two');
+    }
+
+    public function testPruneSiblingsIsANoOpOnAMissingCacheRoot(): void
+    {
+        // must not throw
+        Store::pruneSiblings($this->project->path('.zefram'), 'current');
+
+        $this->assertDirectoryDoesNotExist($this->project->path('.zefram'));
+    }
+
+    public function testPruneSiblingsLeavesEverythingWhenOnlyTheCurrentFingerprintExists(): void
+    {
+        $cacheRoot = $this->project->path('.zefram');
+        $this->populateShard($cacheRoot . '/current');
+
+        Store::pruneSiblings($cacheRoot, 'current');
+
+        $this->assertDirectoryExists($cacheRoot . '/current');
+    }
+
+    private function populateShard(string $fingerprintDirectory): void
+    {
+        $store = new Store($fingerprintDirectory);
+        $store->put('App\\Tests\\AlphaTest', 'testOne', new TestRecord(['src/A.php' => 'x'], 0.1, TestRecord::RESULT_PASSED));
+        $store->flush();
+    }
 }

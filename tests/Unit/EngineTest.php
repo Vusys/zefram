@@ -202,6 +202,43 @@ final class EngineTest extends TestCase
         $this->assertStringContainsString('skipped 1 of 1', $summary);
     }
 
+    public function testIsFullRunReflectsConfig(): void
+    {
+        $this->assertFalse($this->engine(fullRun: false)->isFullRun());
+        $this->assertTrue($this->engine(fullRun: true)->isFullRun());
+    }
+
+    public function testFullRunPrunesStaleFingerprintDirectoriesOnFinish(): void
+    {
+        $this->runAndPass('testEngage'); // populates .zefram/fp on disk
+
+        // a stale fingerprint directory left behind by an earlier config change (see #6)
+        $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
+
+        $this->engine(fullRun: true)->finish();
+
+        $this->assertDirectoryDoesNotExist($this->project->path('.zefram/stale-fingerprint'));
+        $this->assertDirectoryExists($this->project->path('.zefram/fp'), 'the current fingerprint must survive its own prune');
+    }
+
+    public function testNonFullRunNeverPrunesFingerprintDirectories(): void
+    {
+        $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
+
+        $this->engine(fullRun: false)->finish();
+
+        $this->assertDirectoryExists($this->project->path('.zefram/stale-fingerprint'), 'a filtered/grouped/paratest run must never prune');
+    }
+
+    public function testDisabledEngineNeverPrunesEvenOnAFullRun(): void
+    {
+        $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
+
+        $this->engine(enabled: false, fullRun: true)->finish();
+
+        $this->assertDirectoryExists($this->project->path('.zefram/stale-fingerprint'));
+    }
+
     private function runAndPass(string $method, int|string $dataName = ''): void
     {
         $engine = $this->engine();
@@ -217,17 +254,18 @@ final class EngineTest extends TestCase
     /**
      * @param list<string> $neverSkip
      */
-    private function engine(bool $enabled = true, array $neverSkip = []): Engine
+    private function engine(bool $enabled = true, array $neverSkip = [], bool $fullRun = false): Engine
     {
         $config = new Config(
             enabled: $enabled,
             projectRoot: $this->project->root,
             neverSkip: $neverSkip,
+            fullRun: $fullRun,
         );
 
         // fresh store + hasher per engine simulates a new process; fixed fingerprint keeps
         // the cache namespace stable across the simulated runs
-        return new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher());
+        return new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp');
     }
 }
 

@@ -42,6 +42,7 @@ final class Engine
         private readonly CoverageDriver $driver,
         private readonly Store $store,
         private readonly FileHasher $hasher,
+        private readonly string $fingerprint = '',
     ) {
     }
 
@@ -52,7 +53,7 @@ final class Engine
         $fingerprint = Fingerprint::compute($config, $driver->name(), self::VERSION, $hasher);
         $store = new Store($config->cachePath() . '/' . $fingerprint);
 
-        return new self($config, $driver, $store, $hasher);
+        return new self($config, $driver, $store, $hasher, $fingerprint);
     }
 
     public function shouldSkip(string $class, string $method, int|string $dataName): bool
@@ -164,6 +165,10 @@ final class Engine
     {
         $this->store->flush();
 
+        if ($this->active() && $this->isFullRun()) {
+            Store::pruneSiblings($this->config->cachePath(), $this->fingerprint);
+        }
+
         if (!$this->config->enabled || $this->testsSeen === 0) {
             return null;
         }
@@ -178,6 +183,18 @@ final class Engine
             $this->testsSeen,
             self::formatSeconds($this->timeSaved),
         );
+    }
+
+    /**
+     * Unfiltered, non-grouped, non-parallel — see #20's correctness guards. Only safe
+     * condition to prune stale cache state under (#6 fingerprint directories, #7 stale
+     * per-test records): a partial or parallel run must never delete state another process
+     * or a later un-filtered run might still need. Computed once by ZeframExtension from
+     * PHPUnit's Configuration + TEST_TOKEN; defaults false on a directly-constructed Engine.
+     */
+    public function isFullRun(): bool
+    {
+        return $this->config->fullRun;
     }
 
     private function active(): bool
