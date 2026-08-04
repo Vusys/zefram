@@ -1,5 +1,10 @@
 # Zefram Tests
 
+[![Tests](https://github.com/Vusys/zefram/actions/workflows/tests.yml/badge.svg)](https://github.com/Vusys/zefram/actions/workflows/tests.yml)
+[![PHP](https://img.shields.io/badge/php-%5E8.2-777bb4)](composer.json)
+[![PHPUnit](https://img.shields.io/badge/phpunit-%5E11.5%20%7C%7C%20%5E12.0-3b82f6)](composer.json)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 Tests running faster than light. Zefram records the set of files each PHPUnit test executes and, on later runs, skips any test whose recorded files are all unchanged since it last passed — before your framework boots, before the database refreshes.
 
 > **Status: pre-alpha.** The core engine is unit-tested and the mechanics are validated against a real Laravel 12 app (see the M0 spike: capture overhead ~0.25ms/test, an 11× rerun speedup with a seeder-heavy suite skipped without touching the database). Not yet on Packagist; not yet integrated end-to-end.
