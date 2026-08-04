@@ -154,6 +154,40 @@ final class GraphGenerator
     }
 
     /**
+     * Every node whose test *actually executes* $name's code, directly or transitively —
+     * since each node's run() calls its dependencies' run(), a node's coverage includes
+     * every ancestor in its dependency chain, not just its direct dependencies. This is the
+     * set a real content-hash cache invalidates when $name changes, computed from the known
+     * edge list rather than by hand.
+     *
+     * @return list<string>
+     */
+    public function transitiveDependentsOf(string $name): array
+    {
+        $found = [];
+        $frontier = [$name];
+
+        while ($frontier !== []) {
+            $next = [];
+
+            foreach ($frontier as $current) {
+                foreach ($this->directDependentsOf($current) as $dependent) {
+                    if (!in_array($dependent, $found, true)) {
+                        $found[] = $dependent;
+                        $next[] = $dependent;
+                    }
+                }
+            }
+
+            $frontier = $next;
+        }
+
+        sort($found);
+
+        return $found;
+    }
+
+    /**
      * @return list<string> every node name currently defined
      */
     public function nodeNames(): array

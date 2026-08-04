@@ -23,6 +23,8 @@ use SplFileInfo;
  */
 final class DogfoodRunner
 {
+    use ReadsZeframShards;
+
     public readonly string $root;
 
     /** @var list<string> */
@@ -72,52 +74,9 @@ final class DogfoodRunner
         $this->write($relativePath, $transform($this->read($relativePath)));
     }
 
-    /**
-     * Every stored test record across every shard the child run produced, keyed by
-     * "FullyQualified\ClassName::method" (matching ChildRunResult/TestOutcome's id format —
-     * none of the dogfooded classes use PHPUnit data providers, so the raw stored key is
-     * always a bare method name).
-     *
-     * @return array<string, array{files: array<string, string>, duration: float, result: string}>
-     */
-    public function shardRecords(): array
+    public function cacheRoot(): string
     {
-        $records = [];
-
-        foreach (glob($this->root . '/.zefram/*/tests/*.json') ?: [] as $shardFile) {
-            $decoded = json_decode((string) file_get_contents($shardFile), true);
-
-            if (!is_array($decoded) || !isset($decoded['class'], $decoded['tests']) || !is_array($decoded['tests'])) {
-                continue;
-            }
-
-            foreach ($decoded['tests'] as $key => $record) {
-                $records[$decoded['class'] . '::' . $key] = $record;
-            }
-        }
-
-        return $records;
-    }
-
-    /**
-     * Ground truth read straight from the last run's own coverage output — not a guess:
-     * every test id whose recorded file set includes $relativePath.
-     *
-     * @return list<string>
-     */
-    public function testsThatExecuted(string $relativePath): array
-    {
-        $ids = [];
-
-        foreach ($this->shardRecords() as $id => $record) {
-            if (array_key_exists($relativePath, $record['files'] ?? [])) {
-                $ids[] = $id;
-            }
-        }
-
-        sort($ids);
-
-        return $ids;
+        return $this->root;
     }
 
     public function destroy(): void
