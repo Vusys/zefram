@@ -62,6 +62,34 @@ final class FingerprintTest extends TestCase
         $this->assertNotSame($before, $this->compute(watched: ['config/*.php']));
     }
 
+    public function testRecursiveGlobsMatchNestedFiles(): void
+    {
+        $this->project->write('resources/views/welcome.blade.php', '<p>hi</p>');
+        $this->project->write('resources/views/crew/index.blade.php', '<p>crew</p>');
+
+        $before = $this->compute(watched: ['resources/views/**/*.blade.php']);
+
+        $this->project->write('resources/views/crew/index.blade.php', '<p>more crew</p>');
+
+        $this->assertNotSame($before, $this->compute(watched: ['resources/views/**/*.blade.php']));
+    }
+
+    public function testRecursiveGlobIgnoresNonMatchingNestedFiles(): void
+    {
+        $this->project->write('config/app.php', '<?php return [];');
+        $this->project->write('config/nested/deep.php', '<?php return [];');
+
+        $before = $this->compute(watched: ['config/**']);
+
+        $this->project->write('resources/views/welcome.blade.php', 'not watched');
+
+        $this->assertSame($before, $this->compute(watched: ['config/**']));
+
+        $this->project->write('config/nested/deep.php', '<?php return ["changed" => 1];');
+
+        $this->assertNotSame($before, $this->compute(watched: ['config/**']));
+    }
+
     public function testChangesWithDriverName(): void
     {
         $this->assertNotSame($this->compute(driver: 'pcov'), $this->compute(driver: 'other'));

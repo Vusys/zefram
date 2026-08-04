@@ -2,11 +2,11 @@
 
 Tests running faster than light. Zefram records the set of files each PHPUnit test executes and, on later runs, skips any test whose recorded files are all unchanged since it last passed — before your framework boots, before the database refreshes.
 
-> **Status: pre-alpha.** The core engine works and is unit-tested; the pcov capture layer and PHPUnit wiring are being validated against a real Laravel app. Not yet on Packagist. Several behaviors marked `TODO(spike #N)` in the source await confirmation from that spike.
+> **Status: pre-alpha.** The core engine is unit-tested and the mechanics are validated against a real Laravel 12 app (see the M0 spike: capture overhead ~0.25ms/test, an 11× rerun speedup with a seeder-heavy suite skipped without touching the database). Not yet on Packagist; not yet integrated end-to-end.
 
 ## How it works
 
-1. A trait in your base TestCase runs a skip check in a `#[Before(priority: PHP_INT_MAX)]` hook — ahead of `setUp()`, so a skipped test never boots Laravel, never touches the database.
+1. A trait in your base TestCase overrides `setUp()` and decides the skip before delegating to `parent::setUp()` — so a skipped test never boots Laravel, never touches the database. (A `#[Before]` hook can't do this: PHPUnit swallows a skip thrown there and runs `setUp()` anyway.)
 2. If the test runs and passes, a PHPUnit extension records the files it executed (captured per-test via pcov) with content hashes, sharded per test class under `.zefram/`.
 3. Next run, if every recorded file hashes the same — and the global fingerprint (composer.lock, phpunit config, PHP version, watched paths) matches — the test is skipped.
 
@@ -15,7 +15,7 @@ Failures are never cached: only a passing run can create a skip record, and any 
 ## Installation
 
 ```bash
-composer require --dev vusys/zefram-tests
+composer require --dev vusys/zefram
 ```
 
 Requires PHP ≥ 8.2, PHPUnit ≥ 11.5, and [pcov](https://github.com/krakjoe/pcov) (without it Zefram disables itself and all tests run normally).
@@ -29,6 +29,17 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 }
 ```
 
+If your TestCase defines its own `setUp()`, it takes precedence over the trait's — call the helper first thing instead:
+
+```php
+protected function setUp(): void
+{
+    $this->zeframSetUp();
+    parent::setUp();
+    // your setup
+}
+```
+
 Register the extension in `phpunit.xml`:
 
 ```xml
@@ -36,7 +47,7 @@ Register the extension in `phpunit.xml`:
     <bootstrap class="Vusys\Zefram\PhpUnit\ZeframExtension">
         <parameter name="enabled" value="true"/>
         <parameter name="cacheDirectory" value=".zefram"/>
-        <parameter name="watchedPaths" value=".env.testing,config/*.php,database/migrations/*.php"/>
+        <parameter name="watchedPaths" value=".env.testing,config/**,database/migrations/**,resources/views/**/*.blade.php"/>
     </bootstrap>
 </extensions>
 ```
@@ -57,7 +68,7 @@ Coverage-as-critical-path is a heuristic. It cannot see env vars, time, randomne
 
 - `#[\Vusys\Zefram\Attribute\NeverSkip]` on a test class or method.
 - `neverSkip` parameter with fnmatch patterns: `<parameter name="neverSkip" value="App\Tests\Flaky\*"/>`.
-- `watchedPaths` for file-shaped dependencies — any change to a matched file invalidates the entire cache.
+- `watchedPaths` for file-shaped dependencies — any change to a matched file invalidates the entire cache. Patterns support `**` for recursive matching. Laravel users should always watch `config/**` (config files are visible to coverage only until `config:cache` makes them a blind spot — exactly the CI runs you want to accelerate) and Blade *sources* (the compiled artifacts are deleted by `view:clear`).
 - `ZEFRAM=0` environment variable disables everything for a run.
 
 Zefram also disables itself automatically when PHPUnit is collecting coverage (`--coverage-*`), since both would contend for pcov and skipped tests would falsify the report.

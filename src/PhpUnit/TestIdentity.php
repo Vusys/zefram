@@ -9,10 +9,9 @@ use PHPUnit\Event\Code\TestMethod;
 
 /**
  * Extracts (class, method, dataName) from event-side test objects, matching what the
- * trait sees via $this->name() / $this->dataName().
- *
- * TODO(spike #6): verify dataSetName() here agrees exactly with TestCase::dataName()
- * for named and positional datasets.
+ * trait sees via $this->name() / $this->dataName(): the string key for named datasets,
+ * the integer index for positional ones, '' when there is no provider. Verified
+ * identical on both sides against PHPUnit 11.5.
  */
 final class TestIdentity
 {

@@ -26,12 +26,18 @@ use Vusys\Zefram\Zefram;
  *         <bootstrap class="Vusys\Zefram\PhpUnit\ZeframExtension">
  *             <parameter name="enabled" value="true"/>
  *             <parameter name="cacheDirectory" value=".zefram"/>
- *             <parameter name="watchedPaths" value=".env.testing,config/*.php,database/migrations/*.php"/>
+ *             <parameter name="watchedPaths" value=".env.testing,config/**,database/migrations/**,resources/views/**/*.blade.php"/>
  *             <parameter name="neverSkip" value="App\Tests\Flaky\*"/>
  *         </bootstrap>
  *     </extensions>
  *
+ * Laravel users should watch config/** unconditionally: config files are visible to
+ * coverage in uncached runs but invisible once config:cache is active — exactly the
+ * CI/production-like runs this package wants to accelerate. Watch Blade sources rather
+ * than relying on the compiled artifacts (which view:clear deletes).
+ *
  * The ZEFRAM environment variable overrides the enabled parameter (ZEFRAM=0 kill switch).
+ * Parameter values always arrive as strings and are cast here.
  */
 final class ZeframExtension implements Extension
 {
@@ -79,31 +85,11 @@ final class ZeframExtension implements Extension
 
         // PHPUnit collecting its own coverage and zefram clearing the pcov buffer per test
         // would corrupt each other — and skipping tests would falsify the report anyway.
-        // TODO(spike #5): confirm this is the right way to detect a coverage run.
-        if ($this->collectsCoverage($configuration)) {
+        if ($configuration->hasCoverageReport()) {
             return false;
         }
 
         return true;
-    }
-
-    private function collectsCoverage(Configuration $configuration): bool
-    {
-        foreach ([
-            'hasCoverageClover',
-            'hasCoverageCobertura',
-            'hasCoverageCrap4j',
-            'hasCoverageHtml',
-            'hasCoveragePhp',
-            'hasCoverageText',
-            'hasCoverageXml',
-        ] as $method) {
-            if (method_exists($configuration, $method) && $configuration->{$method}()) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function configurationFile(Configuration $configuration): ?string

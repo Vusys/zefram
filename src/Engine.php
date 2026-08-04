@@ -258,8 +258,7 @@ final class Engine
     private function takePending(string $id): ?array
     {
         // Outcome events can arrive before or after the #[After] hook depending on PHPUnit
-        // internals (TODO(spike #2): pin down the order); close the window ourselves if it
-        // is still open for this test.
+        // internals; close the window ourselves if it is still open for this test.
         if (!isset($this->pending[$id]) && $this->current !== null && self::id($this->current['class'], $this->current['key']) === $id) {
             $this->stopCapture();
         }
@@ -277,8 +276,8 @@ final class Engine
 
     private static function testKey(string $method, int|string $dataName): string
     {
-        // TODO(spike #6): confirm TestCase::dataName() and the event-side dataSetName agree
-        // for both named and positional datasets.
+        // Named datasets key on their string key, positional on the integer index —
+        // identical between TestCase::dataName() and the event-side dataSetName().
         return $dataName === '' ? $method : $method . '#' . $dataName;
     }
 

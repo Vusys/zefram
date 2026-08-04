@@ -9,9 +9,9 @@ namespace Vusys\Zefram\Coverage;
  * (including tests/) with pcov.exclude keeping vendor/ out — pcov's default directory
  * heuristic misses tests/.
  *
- * TODO(spike #3): confirm windowing semantics — that collect()+clear() between tests
- * prevents attribution bleeding across consecutive tests, and what collect() returns
- * when start() was never called.
+ * collect() is called with its default (\pcov\all): the inclusive/exclusive modes expect
+ * an explicit filter list and return nothing without one. Per-test windowing via
+ * clear() between tests keeps attribution from bleeding across consecutive tests.
  */
 final class PcovDriver implements CoverageDriver
 {
@@ -38,6 +38,20 @@ final class PcovDriver implements CoverageDriver
 
         \pcov\clear();
 
-        return array_keys($coverage);
+        $files = [];
+
+        // collect() includes every instrumented file compiled during the window; keep
+        // only files with at least one executed line.
+        foreach ($coverage as $file => $lines) {
+            foreach ($lines as $count) {
+                if ($count > 0) {
+                    $files[] = $file;
+
+                    continue 2;
+                }
+            }
+        }
+
+        return $files;
     }
 }
