@@ -246,10 +246,24 @@ final class Engine
      * per-test records): a partial or parallel run must never delete state another process
      * or a later un-filtered run might still need. Computed once by ZeframExtension from
      * PHPUnit's Configuration + TEST_TOKEN; defaults false on a directly-constructed Engine.
+     * Also unconditionally false under paratest regardless of what \$config->fullRun says —
+     * a structural guarantee (#11) rather than trusting every caller to have already
+     * factored isParatestWorker() into fullRun themselves.
      */
     public function isFullRun(): bool
     {
-        return $this->config->fullRun;
+        return $this->config->fullRun && !$this->config->paratestWorker;
+    }
+
+    /**
+     * Paratest sets TEST_TOKEN in every worker process it spawns (see Vusys\Zefram\Paratest,
+     * #11). A worker only ever sees a partial view of the suite (paratest's default
+     * WrapperRunner distributes work per test class), which #12's per-worker summary
+     * suppression also keys off.
+     */
+    public function isParatestWorker(): bool
+    {
+        return $this->config->paratestWorker;
     }
 
     private function active(): bool

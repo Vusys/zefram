@@ -30,5 +30,8 @@
     "scripts": {
         "test": "phpunit",
         "test:e2e": "phpunit --testsuite e2e"
+    },
+    "require-dev": {
+        "brianium/paratest": "^7.20"
     }
 }

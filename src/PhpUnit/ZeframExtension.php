@@ -10,6 +10,7 @@ use PHPUnit\Runner\Extension\ParameterCollection;
 use PHPUnit\TextUI\Configuration\Configuration;
 use Vusys\Zefram\Config;
 use Vusys\Zefram\Engine;
+use Vusys\Zefram\Paratest;
 use Vusys\Zefram\PhpUnit\Subscriber\ExecutionFinishedSubscriber;
 use Vusys\Zefram\PhpUnit\Subscriber\TestConsideredRiskySubscriber;
 use Vusys\Zefram\PhpUnit\Subscriber\TestErroredSubscriber;
@@ -55,6 +56,7 @@ final class ZeframExtension implements Extension
             neverSkip: $this->list($parameters, 'neverSkip'),
             configurationFile: $this->configurationFile($configuration),
             fullRun: $this->isFullRun($configuration),
+            paratestWorker: Paratest::isWorker(),
         );
 
         $engine = Engine::create($config);
@@ -102,12 +104,13 @@ final class ZeframExtension implements Extension
      * range throws from hasExcludeGroups() the way an older FilterNotConfigured-prone
      * implementation did.
      *
-     * TEST_TOKEN is paratest's per-worker marker (formalized as Engine::isParatestWorker()
-     * in #11); checked here too since a worker only ever sees a partial view of the suite.
+     * Paratest::isWorker() (#11) is checked here too since a worker only ever sees a
+     * partial view of the suite — Engine::isFullRun() also re-checks it structurally, but
+     * there is no reason to compute fullRun=true here just to have it overridden there.
      */
     private function isFullRun(Configuration $configuration): bool
     {
-        if (getenv('TEST_TOKEN') !== false) {
+        if (Paratest::isWorker()) {
             return false;
         }
 

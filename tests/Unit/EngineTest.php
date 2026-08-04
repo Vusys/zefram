@@ -315,6 +315,33 @@ final class EngineTest extends TestCase
         $this->assertDirectoryExists($this->project->path('.zefram/stale-fingerprint'));
     }
 
+    public function testIsParatestWorkerReflectsConfig(): void
+    {
+        $this->assertFalse($this->engine()->isParatestWorker());
+        $this->assertTrue($this->engine(paratestWorker: true)->isParatestWorker());
+    }
+
+    public function testIsFullRunIsFalseUnderParatestEvenWhenOtherwiseAFullRun(): void
+    {
+        // a structural guarantee (#11): paratestWorker forces isFullRun() false regardless
+        // of what fullRun alone says, so pruning never trusts a caller to have already
+        // combined the two conditions correctly.
+        $this->assertFalse($this->engine(fullRun: true, paratestWorker: true)->isFullRun());
+        $this->assertTrue($this->engine(fullRun: true, paratestWorker: false)->isFullRun());
+    }
+
+    public function testParatestWorkerNeverPrunesEvenOnAnOtherwiseFullRun(): void
+    {
+        $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
+
+        $this->engine(fullRun: true, paratestWorker: true)->finish();
+
+        $this->assertDirectoryExists(
+            $this->project->path('.zefram/stale-fingerprint'),
+            'a paratest worker only sees a partial view of the suite and must never prune',
+        );
+    }
+
     private function runAndPass(string $method, int|string $dataName = ''): void
     {
         $engine = $this->engine();
@@ -330,13 +357,14 @@ final class EngineTest extends TestCase
     /**
      * @param list<string> $neverSkip
      */
-    private function engine(bool $enabled = true, array $neverSkip = [], bool $fullRun = false): Engine
+    private function engine(bool $enabled = true, array $neverSkip = [], bool $fullRun = false, bool $paratestWorker = false): Engine
     {
         $config = new Config(
             enabled: $enabled,
             projectRoot: $this->project->root,
             neverSkip: $neverSkip,
             fullRun: $fullRun,
+            paratestWorker: $paratestWorker,
         );
 
         // fresh store + hasher per engine simulates a new process; fixed fingerprint keeps
