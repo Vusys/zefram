@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vusys\Zefram\Console;
 
 use Vusys\Zefram\Console\Command\ClearCommand;
+use Vusys\Zefram\Console\Command\StatsCommand;
 
 /**
  * A thin $argv dispatcher for `vendor/bin/zefram <command>` — no framework needed, PHPUnit
@@ -21,6 +22,7 @@ final class Application
 
         $this->commands = [
             'clear' => new ClearCommand($projectRoot),
+            'stats' => new StatsCommand($projectRoot),
         ];
     }
 

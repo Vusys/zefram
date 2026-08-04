@@ -88,6 +88,20 @@ up a fresh one, and the previous fingerprint's directory gets deleted the
 next time you run your suite normally). A no-op, not an error, if the cache
 directory doesn't exist yet.
 
+```bash
+vendor/bin/zefram stats
+vendor/bin/zefram stats --json
+```
+
+Reads `.zefram/<fingerprint>/tests/*.json` shards directly — no PHPUnit run
+involved — and reports the total tracked tests, how many are eligible to
+skip next run, and the aggregate stored duration (the sum of every test's
+last recorded run time — roughly how much wall-clock a full run would
+recover from skipping). The fingerprint is recomputed the same way a real
+run would right now, so this always reflects your current `composer.lock`/
+`phpunit.xml`/PHP version, not a stale cache from before your last dependency
+bump. `--json` emits the same data as structured JSON, for CI scripting.
+
 ## Development
 
 ```bash
