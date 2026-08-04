@@ -1,0 +1,76 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Dependabot's github-actions PRs only ever touch action SHAs, never PHP —
+    # skip the (expensive) matrix on those branches; actionlint is what
+    # actually validates that kind of change.
+    if: ${{ !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'dependabot/github_actions/')) }}
+    runs-on: ubuntu-latest
+    name: "PHP ${{ matrix.php }} / PHPUnit ${{ matrix.phpunit }}${{ matrix.paratest && ' / paratest' || '' }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+        phpunit: ['11.5', '12.0']
+        paratest: [true, false]
+        exclude:
+          # PHPUnit 12 requires PHP >= 8.3.
+          - php: '8.2'
+            phpunit: '12.0'
+          # brianium/paratest ^7.20 requires phpunit/phpunit ^12.5.14 || ^13.0.5
+          # (confirmed empirically — no ^7.20 release supports the 11.x line),
+          # so it cannot be installed alongside PHPUnit ^11.5 at all, whether or
+          # not paratest actually runs. See the note on #17.
+          - phpunit: '11.5'
+            paratest: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: pcov
+          tools: composer:v2
+
+      - name: Require PHPUnit ^${{ matrix.phpunit }}
+        run: composer require "phpunit/phpunit:^${{ matrix.phpunit }}" --no-update --no-interaction
+
+      # brianium/paratest ^7.20 requires phpunit/phpunit ^12.5.14 || ^13.0.5,
+      # so it can't even be *installed* alongside PHPUnit ^11.5 — not just
+      # unused, a hard resolution conflict. Drop it from the dev install for
+      # 11.5 cells; the paratest:true side of the matrix is already excluded
+      # for phpunit 11.5 above, so nothing here needs paratest present.
+      - name: Drop paratest (incompatible with PHPUnit 11.5)
+        if: matrix.phpunit == '11.5'
+        run: composer remove --dev brianium/paratest --no-update --no-interaction
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Cache Zefram
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .zefram
+          key: zefram-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.lock', 'phpunit.xml') }}
+          restore-keys: |
+            zefram-${{ runner.os }}-php${{ matrix.php }}-
+
+      - name: Run unit suite (paratest)
+        if: matrix.paratest
+        run: vendor/bin/paratest --configuration phpunit.xml
+
+      - name: Run unit suite
+        if: ${{ !matrix.paratest }}
+        run: composer test
+
+      - name: Run e2e suite
+        run: composer test:e2e
