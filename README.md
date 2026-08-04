@@ -121,6 +121,21 @@ run would right now, so this always reflects your current `composer.lock`/
 `phpunit.xml`/PHP version, not a stale cache from before your last dependency
 bump. `--json` emits the same data as structured JSON, for CI scripting.
 
+### Laravel
+
+In a Laravel app, the same commands are also available as artisan commands — the package
+service provider autodiscovers, no `config/app.php` edit needed:
+
+```bash
+php artisan zefram:clear
+php artisan zefram:stats --json
+```
+
+These are thin wrappers over the same classes the standalone CLI calls, so behavior can't
+drift between the two entry points. Purely optional DX — the package itself has no runtime
+`illuminate/*` dependency; `Vusys\Zefram\Laravel\ZeframServiceProvider` only ever loads inside
+an app that already has Laravel installed.
+
 ## Paratest
 
 Zefram works under [paratest](https://github.com/paratestphp/paratest)'s

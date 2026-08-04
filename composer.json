@@ -20,7 +20,15 @@
         "phpunit/phpunit": "^11.5 || ^12.0"
     },
     "suggest": {
-        "ext-pcov": "Required to capture per-test coverage; without it Zefram disables itself and all tests run."
+        "ext-pcov": "Required to capture per-test coverage; without it Zefram disables itself and all tests run.",
+        "laravel/framework": "For the artisan zefram:clear / zefram:stats commands."
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Vusys\\Zefram\\Laravel\\ZeframServiceProvider"
+            ]
+        }
     },
     "autoload": {
         "psr-4": {
@@ -56,6 +64,8 @@
         "infection": "infection --threads=max"
     },
     "require-dev": {
+        "illuminate/console": "^11.44.2 || ^12.4.1 || ^13.0",
+        "illuminate/support": "^11.44.2 || ^12.4.1 || ^13.0",
         "infection/extension-installer": "^0.1.2",
         "infection/infection": "^0.29 || ^0.33 || ^0.34",
         "larastan/larastan": "^3.0",
