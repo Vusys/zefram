@@ -99,12 +99,36 @@ final class FingerprintTest extends TestCase
         $this->assertNotSame($this->compute(driver: 'pcov'), $this->compute(driver: 'other'));
     }
 
+    public function testChangesWhenConfigurationFileContentChanges(): void
+    {
+        $path = $this->project->write('phpunit.xml', '<?xml version="1.0"?><phpunit></phpunit>');
+
+        $before = $this->compute(configurationFile: $path);
+
+        // Fingerprint::compute() hashes the resolved configuration file's content (see
+        // configurationFile()-handling in src/Fingerprint.php) — mutate the content itself,
+        // not its path, composer.lock, watched paths, PHP version, or driver name.
+        $this->project->write('phpunit.xml', '<?xml version="1.0"?><phpunit><parameter name="x" value="y"/></phpunit>');
+
+        $this->assertNotSame($before, $this->compute(configurationFile: $path));
+    }
+
+    public function testUnaffectedByConfigurationFileWhenNoneIsConfigured(): void
+    {
+        $this->assertSame($this->compute(configurationFile: null), $this->compute(configurationFile: null));
+    }
+
     /**
      * @param list<string> $watched
      */
-    private function compute(array $watched = [], string $driver = 'pcov'): string
+    private function compute(array $watched = [], string $driver = 'pcov', ?string $configurationFile = null): string
     {
-        $config = new Config(enabled: true, projectRoot: $this->project->root, watchedPaths: $watched);
+        $config = new Config(
+            enabled: true,
+            projectRoot: $this->project->root,
+            watchedPaths: $watched,
+            configurationFile: $configurationFile,
+        );
 
         // a fresh hasher each time: the memo must not mask disk changes between computations
         return Fingerprint::compute($config, $driver, '0.1.0', new FileHasher());
