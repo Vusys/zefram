@@ -31,6 +31,15 @@ final class Engine
     /** @var array<string, true> */
     private array $selfSkipped = [];
 
+    /**
+     * Every test id actually seen (ran or skipped) this pass — shouldSkip() is the trait's
+     * universal entry point, called exactly once per test regardless of outcome, so it is
+     * where #7's stale-record pruning gets its "what's still real" set.
+     *
+     * @var array<string, true>
+     */
+    private array $observed = [];
+
     private int $testsSeen = 0;
 
     private int $skipped = 0;
@@ -60,11 +69,13 @@ final class Engine
     {
         $this->testsSeen++;
 
+        $key = self::testKey($method, $dataName);
+        $this->observed[self::id($class, $key)] = true;
+
         if (!$this->active() || $this->neverSkips($class, $method)) {
             return false;
         }
 
-        $key = self::testKey($method, $dataName);
         $record = $this->store->get($class, $key);
 
         if ($record === null || $record->result !== TestRecord::RESULT_PASSED || $record->files === []) {
@@ -163,9 +174,16 @@ final class Engine
 
     public function finish(): ?string
     {
+        $fullRun = $this->active() && $this->isFullRun();
+
+        if ($fullRun) {
+            // must run before flush() so the drops persist (#7)
+            $this->store->pruneStaleRecords($this->observed);
+        }
+
         $this->store->flush();
 
-        if ($this->active() && $this->isFullRun()) {
+        if ($fullRun) {
             Store::pruneSiblings($this->config->cachePath(), $this->fingerprint);
         }
 

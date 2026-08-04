@@ -66,6 +66,39 @@ final class Store
         $this->dirty = [];
     }
 
+    /**
+     * Drops every stored record whose id ("FullyQualified\Class::testKey") is not in
+     * $observedIds — a test method deleted from source (renamed, removed, or its whole
+     * class deleted) leaves an orphaned record forever otherwise (harmless for correctness,
+     * but drifts shards and `zefram stats` (#9) from reality). Must run before flush() so
+     * the drops persist. Scans every shard file on disk under this store's own directory,
+     * not just classes already touched this run — an entirely-deleted class's shard is
+     * never loaded by get()/put() at all otherwise, since no test of it ran or was skipped.
+     * Caller must only invoke this on a full run (see Engine::isFullRun()): a partial or
+     * parallel run only observes a subset of the suite and would wrongly prune the rest.
+     *
+     * @param array<string, true> $observedIds every test id actually seen (ran or skipped) this pass
+     */
+    public function pruneStaleRecords(array $observedIds): void
+    {
+        foreach (glob($this->directory . '/tests/*.json') ?: [] as $shardFile) {
+            $decoded = json_decode((string) file_get_contents($shardFile), true);
+
+            if (!is_array($decoded) || !isset($decoded['class'], $decoded['tests']) || !is_array($decoded['tests'])) {
+                continue;
+            }
+
+            $class = (string) $decoded['class'];
+            $this->load($class);
+
+            foreach (array_keys($this->shards[$class] ?? []) as $testKey) {
+                if (!isset($observedIds[$class . '::' . $testKey])) {
+                    $this->drop($class, $testKey);
+                }
+            }
+        }
+    }
+
     private function load(string $class): void
     {
         if (isset($this->loaded[$class])) {

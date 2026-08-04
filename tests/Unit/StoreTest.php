@@ -126,6 +126,51 @@ final class StoreTest extends TestCase
         $this->assertDirectoryExists($cacheRoot . '/current');
     }
 
+    public function testPruneStaleRecordsDropsIdsNotInTheObservedSet(): void
+    {
+        $store = new Store($this->project->path('.zefram/fp'));
+        $store->put('App\\Tests\\AlphaTest', 'testOne', new TestRecord(['src/A.php' => 'x'], 0.1, TestRecord::RESULT_PASSED));
+        $store->put('App\\Tests\\AlphaTest', 'testTwo', new TestRecord(['src/A.php' => 'x'], 0.1, TestRecord::RESULT_PASSED));
+        $store->flush();
+
+        $store->pruneStaleRecords(['App\\Tests\\AlphaTest::testOne' => true]);
+        $store->flush();
+
+        $reloaded = new Store($this->project->path('.zefram/fp'));
+        $this->assertNotNull($reloaded->get('App\\Tests\\AlphaTest', 'testOne'));
+        $this->assertNull($reloaded->get('App\\Tests\\AlphaTest', 'testTwo'), 'not in the observed set: must be dropped');
+    }
+
+    public function testPruneStaleRecordsScansShardsNeverLoadedThisRun(): void
+    {
+        // simulates a whole test class deleted from source: its shard sits on disk but no
+        // get()/put() this run ever touches it, since no test of it ran or was skipped
+        $original = new Store($this->project->path('.zefram/fp'));
+        $original->put('App\\Tests\\VanishedTest', 'testGone', new TestRecord(['src/A.php' => 'x'], 0.1, TestRecord::RESULT_PASSED));
+        $original->flush();
+
+        $freshRun = new Store($this->project->path('.zefram/fp'));
+        $freshRun->pruneStaleRecords([]); // nothing observed this pass
+        $freshRun->flush();
+
+        $reloaded = new Store($this->project->path('.zefram/fp'));
+        $this->assertNull($reloaded->get('App\\Tests\\VanishedTest', 'testGone'));
+        $this->assertSame([], glob($this->project->path('.zefram/fp/tests/*.json')) ?: [], 'the now-empty shard file must be removed too');
+    }
+
+    public function testPruneStaleRecordsKeepsEverythingWhenAllIdsAreObserved(): void
+    {
+        $store = new Store($this->project->path('.zefram/fp'));
+        $store->put('App\\Tests\\AlphaTest', 'testOne', new TestRecord(['src/A.php' => 'x'], 0.1, TestRecord::RESULT_PASSED));
+        $store->flush();
+
+        $store->pruneStaleRecords(['App\\Tests\\AlphaTest::testOne' => true]);
+        $store->flush();
+
+        $reloaded = new Store($this->project->path('.zefram/fp'));
+        $this->assertNotNull($reloaded->get('App\\Tests\\AlphaTest', 'testOne'));
+    }
+
     private function populateShard(string $fingerprintDirectory): void
     {
         $store = new Store($fingerprintDirectory);

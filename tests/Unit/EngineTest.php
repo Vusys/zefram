@@ -221,6 +221,37 @@ final class EngineTest extends TestCase
         $this->assertDirectoryExists($this->project->path('.zefram/fp'), 'the current fingerprint must survive its own prune');
     }
 
+    public function testFullRunPrunesRecordsForTestsThatNoLongerExist(): void
+    {
+        $this->runAndPass('testEngage');
+        $this->runAndPass('testBeam', 'two to beam up'); // simulates a method later renamed/deleted
+
+        // a full-run pass that only observes testEngage — testBeam is never seen (ran or
+        // skipped) this time, exactly as if it had been removed from the class
+        $engine = $this->engine(fullRun: true);
+        $engine->shouldSkip(self::TEST_CLASS, 'testEngage', '');
+        $engine->finish();
+
+        $this->assertTrue($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''), 'still-observed test keeps its record');
+        $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testBeam', 'two to beam up'), 'the vanished method\'s record must have been pruned');
+    }
+
+    public function testNonFullRunNeverPrunesStaleRecords(): void
+    {
+        $this->runAndPass('testEngage');
+        $this->runAndPass('testBeam', 'two to beam up');
+
+        // filtered/grouped/paratest run: only testEngage observed, but fullRun is false
+        $engine = $this->engine(fullRun: false);
+        $engine->shouldSkip(self::TEST_CLASS, 'testEngage', '');
+        $engine->finish();
+
+        $this->assertTrue(
+            $this->engine()->shouldSkip(self::TEST_CLASS, 'testBeam', 'two to beam up'),
+            'a non-full-run pass must never prune records for tests it simply did not touch',
+        );
+    }
+
     public function testNonFullRunNeverPrunesFingerprintDirectories(): void
     {
         $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
