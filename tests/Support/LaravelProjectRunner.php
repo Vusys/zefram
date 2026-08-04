@@ -42,6 +42,7 @@ final readonly class LaravelProjectRunner
             $this->renderMigration(),
         );
         file_put_contents($this->root.'/tests/TestbenchZeframTest.php', $this->renderTest());
+        file_put_contents($this->root.'/tests/ArtisanCommandsTest.php', $this->renderArtisanCommandsTest());
         file_put_contents($this->bootstrapPath(), $this->renderBootstrap());
         file_put_contents($this->phpUnitConfigPath(), $this->renderPhpUnitConfig());
     }
@@ -231,6 +232,75 @@ PHP;
             }
         }
         
+        PHP_WRAP;
+    }
+
+    /**
+     * Covers #52: the artisan commands must produce identical output to their
+     * vendor/bin/zefram equivalents (both are thin adapters over the same
+     * Vusys\Zefram\Console\Command\* classes — this proves they can't have drifted), and
+     * autodiscovery-registers via getPackageProviders() the same way Laravel's real
+     * package-discovery manifest would (see the docblock note on the harness limitation
+     * this stands in for).
+     */
+    private function renderArtisanCommandsTest(): string
+    {
+        return <<<'PHP_WRAP'
+        <?php
+
+        declare(strict_types=1);
+
+        namespace Zefram\Generated\LaravelFixture\Tests;
+
+        use Illuminate\Support\Facades\Artisan;
+        use Orchestra\Testbench\TestCase as BaseTestCase;
+        use Vusys\Zefram\Console\Command\ClearCommand as CoreClearCommand;
+        use Vusys\Zefram\Console\Command\StatsCommand as CoreStatsCommand;
+        use Vusys\Zefram\Laravel\ZeframServiceProvider;
+        use Vusys\Zefram\ZeframAware;
+
+        final class ArtisanCommandsTest extends BaseTestCase
+        {
+            use ZeframAware;
+
+            protected function getPackageProviders($app): array
+            {
+                return [ZeframServiceProvider::class];
+            }
+
+            public function testClearCommandMatchesTheStandaloneCli(): void
+            {
+                $root = $this->app->basePath();
+
+                ob_start();
+                (new CoreClearCommand($root))->run([]);
+                $cliOutput = (string) ob_get_clean();
+
+                ob_start();
+                Artisan::call('zefram:clear');
+                $artisanOutput = (string) ob_get_clean();
+
+                $this->assertNotSame('', $cliOutput);
+                $this->assertSame($cliOutput, $artisanOutput);
+            }
+
+            public function testStatsJsonCommandMatchesTheStandaloneCli(): void
+            {
+                $root = $this->app->basePath();
+
+                ob_start();
+                (new CoreStatsCommand($root))->run(['--json']);
+                $cliOutput = (string) ob_get_clean();
+
+                ob_start();
+                Artisan::call('zefram:stats', ['--json' => true]);
+                $artisanOutput = (string) ob_get_clean();
+
+                $this->assertNotSame('', $cliOutput);
+                $this->assertSame($cliOutput, $artisanOutput);
+            }
+        }
+
         PHP_WRAP;
     }
 

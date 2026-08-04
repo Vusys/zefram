@@ -25,6 +25,13 @@ way a real run would right now, so this always reflects your current `composer.l
 `phpunit.xml`/PHP version, not a stale cache from before your last dependency bump. `--json`
 emits the same data as structured JSON, for CI scripting.
 
+## Laravel
+
+In a Laravel app these are also available as artisan commands — `php artisan zefram:clear`
+and `php artisan zefram:stats --json` — via an optional, autodiscovered service provider
+that wraps the same underlying classes the standalone CLI calls. Purely optional DX; the
+package itself has no runtime `illuminate/*` dependency.
+
 Under [paratest](https://github.com/paratestphp/paratest), run `zefram stats` (optionally
 `--json`) after the full parallel run completes to see the real aggregate numbers — a worker
 process never prints its own summary line, to avoid interleaved output from several
