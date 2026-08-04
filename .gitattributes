@@ -11,3 +11,5 @@
 /infection.json5  export-ignore
 /CLAUDE.md        export-ignore
 /CONTRIBUTING.md  export-ignore
+/docs             export-ignore
+/mkdocs.yml       export-ignore

@@ -1,0 +1,9 @@
+/* Minor code-block tweaks on top of the Material theme's default Fira Code styling. */
+
+.md-typeset code {
+    border-radius: 0.2rem;
+}
+
+.md-typeset pre > code {
+    font-size: 0.85em;
+}
