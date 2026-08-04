@@ -116,6 +116,27 @@ run would right now, so this always reflects your current `composer.lock`/
 `phpunit.xml`/PHP version, not a stale cache from before your last dependency
 bump. `--json` emits the same data as structured JSON, for CI scripting.
 
+## Paratest
+
+Zefram works under [paratest](https://github.com/paratestphp/paratest)'s
+default `WrapperRunner`, which distributes work per test class — exactly
+what makes self-contained per-class shards (see How it works, above) safe
+under parallelism: one worker owns one shard file per run, nothing to lock
+or merge.
+
+Every worker process only sees a partial slice of the suite, though, so a
+worker:
+
+- Never prunes stale fingerprint directories or stale per-test records —
+  pruning based on a partial view would delete state other workers still
+  need.
+- Never prints its own `Zefram: skipped ...` summary line — with several
+  concurrent workers each printing one, they'd interleave and mangle the
+  terminal output.
+
+Run `vendor/bin/zefram stats` (optionally `--json` for CI scripting) after
+the full parallel run completes instead, to see the real aggregate numbers.
+
 ## Development
 
 ```bash
