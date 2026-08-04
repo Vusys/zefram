@@ -14,6 +14,15 @@ composer check       # pint:check -> rector:check -> analyse, halts on first fai
 The e2e suite (and the package itself) needs [pcov](https://github.com/krakjoe/pcov); it
 skips itself gracefully without it, same as `composer test:e2e`.
 
+`brianium/paratest` isn't in `require-dev` — it can't install on PHP 8.2, this package's own
+floor, so keeping it there would break `composer install` for every contributor on that PHP
+version. Install it on demand to exercise the paratest path locally:
+
+```bash
+composer require --dev brianium/paratest
+vendor/bin/paratest --configuration phpunit.xml
+```
+
 ## Before opening a PR
 
 - `composer check` and `composer test` must pass locally.
