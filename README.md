@@ -137,6 +137,26 @@ worker:
 Run `vendor/bin/zefram stats` (optionally `--json` for CI scripting) after
 the full parallel run completes instead, to see the real aggregate numbers.
 
+### `--functional` mode is unsupported
+
+Paratest's `--functional` mode distributes work per test *method* instead
+of per class, which breaks the one-worker-owns-one-shard assumption above:
+two methods of the same class can land on different worker processes, each
+independently writing the same shard file (last writer wins).
+
+There's no reliable way to detect `--functional` from inside a worker
+process to guard against this — it's a flag paratest keeps entirely on its
+own orchestrator side and never forwards to a worker (not in the
+`Configuration` object extensions receive, not as an environment variable,
+not anywhere else observable; see the docblock on
+`Vusys\Zefram\Paratest::isWorker()` for the investigation). So this isn't
+guarded against at runtime — it's simply unsupported. Worth noting for risk
+assessment: because shards are self-contained and written atomically (see
+How it works, above), the actual failure mode is a lost/overwritten
+*record*, not a false skip — a clobbered test just reruns next time rather
+than being incorrectly cached. Still, avoid `--functional` with Zefram
+enabled.
+
 ## Development
 
 ```bash
