@@ -1,0 +1,2 @@
+rules:
+    - Vusys\Zefram\PHPStan\NeverSkipCandidateRule

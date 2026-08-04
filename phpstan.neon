@@ -6,3 +6,9 @@ parameters:
         - src
         - tests
     level: 9
+    excludePaths:
+        # Fixtures fed to NeverSkipCandidateRuleTest (#53) — deliberately exhibit the exact
+        # non-deterministic-call patterns the rule detects; not held to this repo's own
+        # quality bar (e.g. asserting on a value PHPStan already knows is never null is the
+        # point of the fixture, not a bug in it).
+        - tests/Unit/PHPStan/Fixtures/*
