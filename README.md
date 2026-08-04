@@ -92,6 +92,27 @@ Coverage-as-critical-path is a heuristic. It cannot see env vars, time, randomne
 
 Zefram also disables itself automatically when PHPUnit is collecting coverage (`--coverage-*`), since both would contend for pcov and skipped tests would falsify the report.
 
+### Finding NeverSkip candidates automatically
+
+Rather than discovering a blind spot the hard way (a false skip in production), opt into
+`Vusys\Zefram\PHPStan\NeverSkipCandidateRule` — a PHPStan rule that flags test methods
+calling known non-deterministic/runtime-only things (`rand()`, `time()`, `now()`, an un-faked
+`Http::` call, raw `curl_exec()`, ...) without a `#[NeverSkip]` attribute already neutralizing
+them. Add to your own `phpstan.neon`:
+
+```neon
+includes:
+    - vendor/vusys/zefram/phpstan-extension.neon
+```
+
+Framework-agnostic checks always run; a handful of Laravel-aware checks (`now()`,
+`Carbon::now()`, `Http::`, `Auth::user()`, `env()`) are name-matched the same way whether or
+not Larastan is present in your project. It's a lint, not full dataflow analysis — a
+preceding `$this->travel(...)`/`freezeTime()`/`Carbon::setTestNow(...)` (for time) or
+`Http::fake()` (for HTTP) in the same method correctly neutralizes the calls after it, but it
+doesn't know about your `watchedPaths` config — `#[NeverSkip]` is the only suppression it
+understands.
+
 ## CLI
 
 ```bash
