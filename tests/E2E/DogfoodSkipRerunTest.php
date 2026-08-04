@@ -16,33 +16,36 @@ final class DogfoodSkipRerunTest extends TestCase
 {
     private const MUTATED_FILE = 'src/Hash/FileHasher.php';
 
-    private ?DogfoodRunner $runner = null;
+    private DogfoodRunner $runner;
 
     protected function setUp(): void
     {
-        if (!DogfoodRunner::pcovAvailable()) {
+        if (! DogfoodRunner::pcovAvailable()) {
             $this->markTestSkipped('ext-pcov is not loaded; the dogfood E2E suite requires it, same as the package itself.');
         }
 
-        $this->runner = new DogfoodRunner();
+        $this->runner = new DogfoodRunner;
     }
 
     protected function tearDown(): void
     {
-        $this->runner?->destroy();
+        // setUp() may skip before $runner is assigned; tearDown() still runs.
+        if (isset($this->runner)) {
+            $this->runner->destroy();
+        }
     }
 
-    public function testColdRunExecutesEveryTest(): void
+    public function test_cold_run_executes_every_test(): void
     {
         $result = $this->runner->run();
 
-        $this->assertSame(0, $result->exitCode, $result->stdout . $result->stderr);
+        $this->assertSame(0, $result->exitCode, $result->stdout.$result->stderr);
         $this->assertSame([], $result->skipped(), 'nothing has a stored record yet, nothing should skip');
         $this->assertNotEmpty($result->passed());
-        $this->assertStringContainsString('Zefram: skipped 0 of ' . count($result->passed()), $result->stdout);
+        $this->assertStringContainsString('Zefram: skipped 0 of '.count($result->passed()), $result->stdout);
     }
 
-    public function testImmediateRerunSkipsEveryTest(): void
+    public function test_immediate_rerun_skips_every_test(): void
     {
         $cold = $this->runner->run();
         $everyTest = $cold->passed();
@@ -50,7 +53,7 @@ final class DogfoodSkipRerunTest extends TestCase
 
         $rerun = $this->runner->run();
 
-        $this->assertSame(0, $rerun->exitCode, $rerun->stdout . $rerun->stderr);
+        $this->assertSame(0, $rerun->exitCode, $rerun->stdout.$rerun->stderr);
         $this->assertSame([], $rerun->passed(), 'nothing changed since the cold pass, nothing should actually execute');
 
         $skipped = $rerun->skipped();
@@ -69,7 +72,7 @@ final class DogfoodSkipRerunTest extends TestCase
      * not a hardcoded guess — and leave every unrelated test (e.g. StoreTest, which never
      * constructs a FileHasher) skipped.
      */
-    public function testMutatingASharedFileRerunsExactlyItsDependentsAndNothingElse(): void
+    public function test_mutating_a_shared_file_reruns_exactly_its_dependents_and_nothing_else(): void
     {
         $this->runner->run(); // cold: populate records
         $this->runner->run(); // stable: prove full-skip before touching anything
@@ -83,11 +86,11 @@ final class DogfoodSkipRerunTest extends TestCase
         sort($expectedToStaySkipped);
         $this->assertNotEmpty($expectedToStaySkipped, 'sanity: at least one unrelated test must exist to prove selectivity');
 
-        $this->runner->mutate(self::MUTATED_FILE, static fn (string $c): string => $c . "\n// zefram e2e mutation: flips the hash, not the behavior\n");
+        $this->runner->mutate(self::MUTATED_FILE, static fn (string $c): string => $c."\n// zefram e2e mutation: flips the hash, not the behavior\n");
 
         $result = $this->runner->run();
 
-        $this->assertSame(0, $result->exitCode, $result->stdout . $result->stderr);
+        $this->assertSame(0, $result->exitCode, $result->stdout.$result->stderr);
 
         $reran = $result->passed();
         sort($reran);
@@ -104,7 +107,7 @@ final class DogfoodSkipRerunTest extends TestCase
      * the reverted content and reruns), and once that revert-run's fresh records are in place,
      * the suite stabilizes back to full-skip.
      */
-    public function testRevertingAMutationReinvalidatesThenStabilizesBackToFullSkip(): void
+    public function test_reverting_a_mutation_reinvalidates_then_stabilizes_back_to_full_skip(): void
     {
         $this->runner->run(); // cold
         $original = $this->runner->read(self::MUTATED_FILE);
@@ -112,33 +115,32 @@ final class DogfoodSkipRerunTest extends TestCase
         $expectedDependents = $this->runner->testsThatExecuted(self::MUTATED_FILE);
         sort($expectedDependents);
 
-        $this->runner->mutate(self::MUTATED_FILE, static fn (string $c): string => $c . "\n// zefram e2e mutation\n");
+        $this->runner->mutate(self::MUTATED_FILE, static fn (string $c): string => $c."\n// zefram e2e mutation\n");
         $mutatedRun = $this->runner->run();
-        $this->assertSame($expectedDependents, self::sorted($mutatedRun->passed()), 'mutation reruns its dependents');
+        $this->assertSame($expectedDependents, $this->sorted($mutatedRun->passed()), 'mutation reruns its dependents');
 
         $this->runner->write(self::MUTATED_FILE, $original);
         $revertRun = $this->runner->run();
 
-        $this->assertSame(0, $revertRun->exitCode, $revertRun->stdout . $revertRun->stderr);
+        $this->assertSame(0, $revertRun->exitCode, $revertRun->stdout.$revertRun->stderr);
         $this->assertSame(
             $expectedDependents,
-            self::sorted($revertRun->passed()),
+            $this->sorted($revertRun->passed()),
             'the stored hash still reflects the mutated content, so reverting must rerun the same dependents again — proves invalidation reacts to the file\'s current state each run, not just "has it ever changed"',
         );
 
         $stableRun = $this->runner->run();
 
-        $this->assertSame(0, $stableRun->exitCode, $stableRun->stdout . $stableRun->stderr);
+        $this->assertSame(0, $stableRun->exitCode, $stableRun->stdout.$stableRun->stderr);
         $this->assertSame([], $stableRun->passed(), 'the file is genuinely back to its original content now, so the suite must fully stabilize back to skip');
         $this->assertNotEmpty($stableRun->skipped());
     }
 
     /**
-     * @param list<string> $ids
-     *
+     * @param  list<string>  $ids
      * @return list<string>
      */
-    private static function sorted(array $ids): array
+    private function sorted(array $ids): array
     {
         sort($ids);
 

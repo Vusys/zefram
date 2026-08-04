@@ -11,9 +11,7 @@ use Vusys\Zefram\PhpUnit\TestIdentity;
 
 final readonly class TestPassedSubscriber implements PassedSubscriber
 {
-    public function __construct(private Engine $engine)
-    {
-    }
+    public function __construct(private Engine $engine) {}
 
     public function notify(Passed $event): void
     {

@@ -24,7 +24,7 @@ final class EngineTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->project = new TempProject();
+        $this->project = new TempProject;
         $this->project->write('src/WarpCore.php', '<?php class WarpCore {}');
         $this->project->write('tests/WarpCoreTest.php', '<?php class WarpCoreTest {}');
 
@@ -45,19 +45,19 @@ final class EngineTest extends TestCase
         }
     }
 
-    public function testFirstRunNeverSkips(): void
+    public function test_first_run_never_skips(): void
     {
         $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
     }
 
-    public function testSkipsUnchangedTestThatPreviouslyPassed(): void
+    public function test_skips_unchanged_test_that_previously_passed(): void
     {
         $this->runAndPass('testEngage');
 
         $this->assertTrue($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
     }
 
-    public function testRerunsWhenAnExecutedFileChanges(): void
+    public function test_reruns_when_an_executed_file_changes(): void
     {
         $this->runAndPass('testEngage');
 
@@ -66,7 +66,7 @@ final class EngineTest extends TestCase
         $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
     }
 
-    public function testRerunsWhenAnExecutedFileIsDeleted(): void
+    public function test_reruns_when_an_executed_file_is_deleted(): void
     {
         $this->runAndPass('testEngage');
 
@@ -75,7 +75,7 @@ final class EngineTest extends TestCase
         $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
     }
 
-    public function testVendorAndOutsideRootFilesAreNotTracked(): void
+    public function test_vendor_and_outside_root_files_are_not_tracked(): void
     {
         $this->runAndPass('testEngage');
 
@@ -84,7 +84,7 @@ final class EngineTest extends TestCase
         $this->assertTrue($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
     }
 
-    public function testFailureDropsTheRecord(): void
+    public function test_failure_drops_the_record(): void
     {
         $this->runAndPass('testEngage');
 
@@ -100,7 +100,7 @@ final class EngineTest extends TestCase
         $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
     }
 
-    public function testForeignSkipDropsTheRecordButSelfSkipKeepsIt(): void
+    public function test_foreign_skip_drops_the_record_but_self_skip_keeps_it(): void
     {
         $this->runAndPass('testEngage');
 
@@ -120,7 +120,7 @@ final class EngineTest extends TestCase
         $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''), 'foreign skip must drop the record');
     }
 
-    public function testDataSetsAreTrackedIndependently(): void
+    public function test_data_sets_are_tracked_independently(): void
     {
         $this->runAndPass('testBeam', 'two to beam up');
 
@@ -131,7 +131,7 @@ final class EngineTest extends TestCase
         $this->assertFalse($engine->shouldSkip(self::TEST_CLASS, 'testBeam', 0));
     }
 
-    public function testPassedWithoutCaptureStoresNothing(): void
+    public function test_passed_without_capture_stores_nothing(): void
     {
         $engine = $this->engine();
         $engine->recordPassed(self::TEST_CLASS, 'testEngage', '');
@@ -140,7 +140,7 @@ final class EngineTest extends TestCase
         $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
     }
 
-    public function testOutcomeBeforeAfterHookClosesTheCaptureWindow(): void
+    public function test_outcome_before_after_hook_closes_the_capture_window(): void
     {
         // PHPUnit may emit Passed before the #[After] hook runs; recordPassed must close
         // the still-open window itself rather than lose the capture
@@ -154,7 +154,7 @@ final class EngineTest extends TestCase
         $this->assertTrue($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
     }
 
-    public function testDisabledEngineNeverSkipsAndNeverCaptures(): void
+    public function test_disabled_engine_never_skips_and_never_captures(): void
     {
         $this->runAndPass('testEngage');
 
@@ -168,7 +168,7 @@ final class EngineTest extends TestCase
         $this->assertSame($startsBefore, $this->driver->starts);
     }
 
-    public function testNeverSkipConfigPatternWins(): void
+    public function test_never_skip_config_pattern_wins(): void
     {
         $this->runAndPass('testEngage');
 
@@ -177,7 +177,7 @@ final class EngineTest extends TestCase
         $this->assertFalse($engine->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
     }
 
-    public function testNeverSkipAttributeWins(): void
+    public function test_never_skip_attribute_wins(): void
     {
         $class = NeverSkipFixture::class;
 
@@ -191,7 +191,7 @@ final class EngineTest extends TestCase
         $this->assertFalse($this->engine()->shouldSkip($class, 'testVolatile', ''));
     }
 
-    public function testSummaryReportsSkips(): void
+    public function test_summary_reports_skips(): void
     {
         $this->runAndPass('testEngage');
 
@@ -204,17 +204,17 @@ final class EngineTest extends TestCase
         $this->assertMatchesRegularExpression('/warp factor \d+\.\d/', $summary);
     }
 
-    public function testWarpFactorComputesRatioOfEstimatedFullRunToActualElapsed(): void
+    public function test_warp_factor_computes_ratio_of_estimated_full_run_to_actual_elapsed(): void
     {
         $config = new Config(enabled: true, projectRoot: $this->project->root);
-        $hasher = new FileHasher();
+        $hasher = new FileHasher;
 
         // seed a known "last recorded duration" for a test that will be skipped this pass
-        $store = new Store($config->cachePath() . '/fp');
+        $store = new Store($config->cachePath().'/fp');
         $store->put(self::TEST_CLASS, 'testEngage', new TestRecord(
             files: [
-                'src/WarpCore.php' => $hasher->hash($this->project->path('src/WarpCore.php')),
-                'tests/WarpCoreTest.php' => $hasher->hash($this->project->path('tests/WarpCoreTest.php')),
+                'src/WarpCore.php' => $this->mustHash($hasher, $this->project->path('src/WarpCore.php')),
+                'tests/WarpCoreTest.php' => $this->mustHash($hasher, $this->project->path('tests/WarpCoreTest.php')),
             ],
             duration: 4.0,
             result: TestRecord::RESULT_PASSED,
@@ -228,7 +228,7 @@ final class EngineTest extends TestCase
             return $times[$i++] ?? end($times);
         };
 
-        $engine = new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp', $clock);
+        $engine = new Engine($config, $this->driver, new Store($config->cachePath().'/fp'), new FileHasher, 'fp', $clock);
 
         $this->assertTrue($engine->shouldSkip(self::TEST_CLASS, 'testEngage', ''), 'sanity: the seeded record must actually be skippable');
 
@@ -237,23 +237,23 @@ final class EngineTest extends TestCase
         $this->assertEqualsWithDelta(0.4, $engine->warpFactor(), 0.0001);
     }
 
-    public function testWarpFactorIsOneWhenElapsedTimeIsZero(): void
+    public function test_warp_factor_is_one_when_elapsed_time_is_zero(): void
     {
         $clock = static fn (): int => 5_000_000_000; // constant: construction and warpFactor() see the same instant
         $config = new Config(enabled: true, projectRoot: $this->project->root);
 
-        $engine = new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp', $clock);
+        $engine = new Engine($config, $this->driver, new Store($config->cachePath().'/fp'), new FileHasher, 'fp', $clock);
 
         $this->assertSame(1.0, $engine->warpFactor());
     }
 
-    public function testIsFullRunReflectsConfig(): void
+    public function test_is_full_run_reflects_config(): void
     {
         $this->assertFalse($this->engine(fullRun: false)->isFullRun());
         $this->assertTrue($this->engine(fullRun: true)->isFullRun());
     }
 
-    public function testFullRunPrunesStaleFingerprintDirectoriesOnFinish(): void
+    public function test_full_run_prunes_stale_fingerprint_directories_on_finish(): void
     {
         $this->runAndPass('testEngage'); // populates .zefram/fp on disk
 
@@ -266,7 +266,7 @@ final class EngineTest extends TestCase
         $this->assertDirectoryExists($this->project->path('.zefram/fp'), 'the current fingerprint must survive its own prune');
     }
 
-    public function testFullRunPrunesRecordsForTestsThatNoLongerExist(): void
+    public function test_full_run_prunes_records_for_tests_that_no_longer_exist(): void
     {
         $this->runAndPass('testEngage');
         $this->runAndPass('testBeam', 'two to beam up'); // simulates a method later renamed/deleted
@@ -281,7 +281,7 @@ final class EngineTest extends TestCase
         $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testBeam', 'two to beam up'), 'the vanished method\'s record must have been pruned');
     }
 
-    public function testNonFullRunNeverPrunesStaleRecords(): void
+    public function test_non_full_run_never_prunes_stale_records(): void
     {
         $this->runAndPass('testEngage');
         $this->runAndPass('testBeam', 'two to beam up');
@@ -297,7 +297,7 @@ final class EngineTest extends TestCase
         );
     }
 
-    public function testNonFullRunNeverPrunesFingerprintDirectories(): void
+    public function test_non_full_run_never_prunes_fingerprint_directories(): void
     {
         $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
 
@@ -306,7 +306,7 @@ final class EngineTest extends TestCase
         $this->assertDirectoryExists($this->project->path('.zefram/stale-fingerprint'), 'a filtered/grouped/paratest run must never prune');
     }
 
-    public function testDisabledEngineNeverPrunesEvenOnAFullRun(): void
+    public function test_disabled_engine_never_prunes_even_on_a_full_run(): void
     {
         $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
 
@@ -315,13 +315,13 @@ final class EngineTest extends TestCase
         $this->assertDirectoryExists($this->project->path('.zefram/stale-fingerprint'));
     }
 
-    public function testIsParatestWorkerReflectsConfig(): void
+    public function test_is_paratest_worker_reflects_config(): void
     {
         $this->assertFalse($this->engine()->isParatestWorker());
         $this->assertTrue($this->engine(paratestWorker: true)->isParatestWorker());
     }
 
-    public function testIsFullRunIsFalseUnderParatestEvenWhenOtherwiseAFullRun(): void
+    public function test_is_full_run_is_false_under_paratest_even_when_otherwise_a_full_run(): void
     {
         // a structural guarantee (#11): paratestWorker forces isFullRun() false regardless
         // of what fullRun alone says, so pruning never trusts a caller to have already
@@ -330,7 +330,7 @@ final class EngineTest extends TestCase
         $this->assertTrue($this->engine(fullRun: true, paratestWorker: false)->isFullRun());
     }
 
-    public function testParatestWorkerNeverPrunesEvenOnAnOtherwiseFullRun(): void
+    public function test_paratest_worker_never_prunes_even_on_an_otherwise_full_run(): void
     {
         $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
 
@@ -355,7 +355,7 @@ final class EngineTest extends TestCase
     }
 
     /**
-     * @param list<string> $neverSkip
+     * @param  list<string>  $neverSkip
      */
     private function engine(bool $enabled = true, array $neverSkip = [], bool $fullRun = false, bool $paratestWorker = false): Engine
     {
@@ -369,11 +369,22 @@ final class EngineTest extends TestCase
 
         // fresh store + hasher per engine simulates a new process; fixed fingerprint keeps
         // the cache namespace stable across the simulated runs
-        return new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp');
+        return new Engine($config, $this->driver, new Store($config->cachePath().'/fp'), new FileHasher, 'fp');
+    }
+
+    /**
+     * FileHasher::hash() is nullable for files that can't be read; here the file was just
+     * written by this same test, so null would mean a real bug, not a case to handle quietly.
+     */
+    private function mustHash(FileHasher $hasher, string $absolutePath): string
+    {
+        $hash = $hasher->hash($absolutePath);
+
+        assert($hash !== null);
+
+        return $hash;
     }
 }
 
 #[NeverSkip]
-final class NeverSkipFixture
-{
-}
+final class NeverSkipFixture {}

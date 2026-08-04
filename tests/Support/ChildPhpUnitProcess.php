@@ -13,11 +13,9 @@ use RuntimeException;
  * harness (#2) and the generator-based E2E test (#23) use this rather than duplicating
  * proc_open/JUnit-parsing logic.
  */
-final class ChildPhpUnitProcess
+final readonly class ChildPhpUnitProcess
 {
-    public function __construct(private readonly string $phpBinary = PHP_BINARY)
-    {
-    }
+    public function __construct(private string $phpBinary = PHP_BINARY) {}
 
     public static function pcovAvailable(): bool
     {
@@ -25,23 +23,23 @@ final class ChildPhpUnitProcess
     }
 
     /**
-     * @param list<string> $extraArgs
+     * @param  list<string>  $extraArgs
      */
     public function run(string $cwd, string $configFile, array $extraArgs = []): ChildRunResult
     {
         $outerRoot = dirname(__DIR__, 2);
-        $phpunitBinary = $outerRoot . '/vendor/bin/phpunit';
+        $phpunitBinary = $outerRoot.'/vendor/bin/phpunit';
 
-        if (!is_file($phpunitBinary)) {
+        if (! is_file($phpunitBinary)) {
             throw new RuntimeException("Zefram dogfood: outer phpunit binary not found at {$phpunitBinary}");
         }
 
-        $junitPath = $cwd . '/junit-' . bin2hex(random_bytes(6)) . '.xml';
+        $junitPath = $cwd.'/junit-'.bin2hex(random_bytes(6)).'.xml';
 
         $command = [
             $this->phpBinary,
             '-d', 'pcov.enabled=1',
-            '-d', 'pcov.directory=' . $cwd,
+            '-d', 'pcov.directory='.$cwd,
             '-d', 'pcov.exclude=~/(vendor)/~',
             $phpunitBinary,
             '-c', $configFile,
@@ -56,7 +54,7 @@ final class ChildPhpUnitProcess
             $cwd,
         );
 
-        if (!is_resource($process)) {
+        if (! is_resource($process)) {
             throw new RuntimeException('Zefram dogfood: failed to start child phpunit process');
         }
 

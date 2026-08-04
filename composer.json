@@ -28,10 +28,22 @@
         "sort-packages": true
     },
     "scripts": {
+        "analyse": "phpstan analyse",
+        "analyze": "@analyse",
+        "rector": "rector process",
+        "rector:check": "rector process --dry-run",
+        "pint": "pint",
+        "pint:check": "pint --test",
+        "check": ["@pint:check", "@rector:check", "@analyse"],
         "test": "phpunit",
         "test:e2e": "phpunit --testsuite e2e"
     },
     "require-dev": {
-        "brianium/paratest": "^7.20"
+        "brianium/paratest": "^7.20",
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.30",
+        "orchestra/testbench": "^9.12 || ^10.1 || ^11.0",
+        "phpstan/phpstan": "^2.2",
+        "rector/rector": "^2.6"
     }
 }

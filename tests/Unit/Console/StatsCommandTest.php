@@ -17,7 +17,7 @@ final class StatsCommandTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->project = new TempProject();
+        $this->project = new TempProject;
         $this->project->write('composer.lock', '{"packages": []}');
     }
 
@@ -28,16 +28,17 @@ final class StatsCommandTest extends TestCase
         }
     }
 
-    public function testReportsZeroTrackedTestsWhenNoCacheExistsYet(): void
+    public function test_reports_zero_tracked_tests_when_no_cache_exists_yet(): void
     {
         $output = $this->runStats();
 
         $this->assertStringContainsString('no tests tracked yet', $output);
     }
 
-    public function testReportsZeroTrackedTestsAsJsonWhenNoCacheExistsYet(): void
+    public function test_reports_zero_tracked_tests_as_json_when_no_cache_exists_yet(): void
     {
         $decoded = json_decode($this->runStats(['--json']), true);
+        $this->assertIsArray($decoded);
 
         $this->assertSame(0, $decoded['trackedTests']);
         $this->assertSame(0, $decoded['eligibleToSkip']);
@@ -45,7 +46,7 @@ final class StatsCommandTest extends TestCase
         $this->assertArrayHasKey('fingerprint', $decoded);
     }
 
-    public function testReportsRealStoredRecordsUnderTheCurrentFingerprint(): void
+    public function test_reports_real_stored_records_under_the_current_fingerprint(): void
     {
         $this->populateCurrentFingerprintShards();
 
@@ -56,18 +57,19 @@ final class StatsCommandTest extends TestCase
         $this->assertStringContainsString('2.0s', $output);
     }
 
-    public function testJsonOutputMatchesTextOutput(): void
+    public function test_json_output_matches_text_output(): void
     {
         $this->populateCurrentFingerprintShards();
 
         $decoded = json_decode($this->runStats(['--json']), true);
+        $this->assertIsArray($decoded);
 
         $this->assertSame(3, $decoded['trackedTests']);
         $this->assertSame(3, $decoded['eligibleToSkip']);
         $this->assertEqualsWithDelta(2.02, $decoded['recordedDurationSeconds'], 0.001);
     }
 
-    public function testIgnoresRecordsUnderADifferentStaleFingerprint(): void
+    public function test_ignores_records_under_a_different_stale_fingerprint(): void
     {
         // simulate a stale fingerprint directory that a real config change left behind —
         // stats must only ever read the *current* fingerprint's shards
@@ -83,7 +85,7 @@ final class StatsCommandTest extends TestCase
     private function populateCurrentFingerprintShards(): void
     {
         $fingerprint = ProjectConfig::currentFingerprint($this->project->root);
-        $store = new Store($this->project->path('.zefram/' . $fingerprint));
+        $store = new Store($this->project->path('.zefram/'.$fingerprint));
         $store->put('App\\Tests\\AlphaTest', 'testOne', new TestRecord(['src/A.php' => 'x'], 0.42, TestRecord::RESULT_PASSED));
         $store->put('App\\Tests\\AlphaTest', 'testTwo', new TestRecord(['src/A.php' => 'x'], 1.5, TestRecord::RESULT_PASSED));
         $store->put('App\\Tests\\BetaTest', 'testThree', new TestRecord(['src/B.php' => 'y'], 0.1, TestRecord::RESULT_PASSED));
@@ -91,7 +93,7 @@ final class StatsCommandTest extends TestCase
     }
 
     /**
-     * @param list<string> $args
+     * @param  list<string>  $args
      */
     private function runStats(array $args = []): string
     {

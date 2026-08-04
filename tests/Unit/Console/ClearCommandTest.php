@@ -14,7 +14,7 @@ final class ClearCommandTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->project = new TempProject();
+        $this->project = new TempProject;
     }
 
     protected function tearDown(): void
@@ -24,7 +24,7 @@ final class ClearCommandTest extends TestCase
         }
     }
 
-    public function testClearsTheDefaultCacheDirectory(): void
+    public function test_clears_the_default_cache_directory(): void
     {
         $this->project->write('.zefram/fp/tests/fake.json', '{}');
 
@@ -34,7 +34,7 @@ final class ClearCommandTest extends TestCase
         $this->assertDirectoryDoesNotExist($this->project->path('.zefram'));
     }
 
-    public function testIsANoOpWhenTheCacheDirectoryDoesNotExist(): void
+    public function test_is_a_no_op_when_the_cache_directory_does_not_exist(): void
     {
         $exitCode = $this->runClear();
 
@@ -42,7 +42,7 @@ final class ClearCommandTest extends TestCase
         $this->assertDirectoryDoesNotExist($this->project->path('.zefram'));
     }
 
-    public function testReadsACustomCacheDirectoryFromPhpUnitXml(): void
+    public function test_reads_a_custom_cache_directory_from_php_unit_xml(): void
     {
         $this->project->write('phpunit.xml', <<<'XML'
 <?xml version="1.0"?>
@@ -64,7 +64,7 @@ XML);
         $this->assertDirectoryExists($this->project->path('.zefram'), 'the default directory was never the configured one — must be untouched');
     }
 
-    public function testOutputsWhatItDid(): void
+    public function test_outputs_what_it_did(): void
     {
         $this->project->write('.zefram/fp/tests/fake.json', '{}');
 

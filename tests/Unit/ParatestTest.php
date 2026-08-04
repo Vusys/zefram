@@ -21,25 +21,25 @@ final class ParatestTest extends TestCase
         if ($this->originalTestToken === false) {
             putenv('TEST_TOKEN');
         } else {
-            putenv('TEST_TOKEN=' . $this->originalTestToken);
+            putenv('TEST_TOKEN='.$this->originalTestToken);
         }
     }
 
-    public function testDetectsAWorkerWhenTestTokenIsSet(): void
+    public function test_detects_a_worker_when_test_token_is_set(): void
     {
         putenv('TEST_TOKEN=1');
 
         $this->assertTrue(Paratest::isWorker());
     }
 
-    public function testNotAWorkerWhenTestTokenIsUnset(): void
+    public function test_not_a_worker_when_test_token_is_unset(): void
     {
         putenv('TEST_TOKEN'); // unset
 
         $this->assertFalse(Paratest::isWorker());
     }
 
-    public function testDetectsAWorkerEvenWhenTestTokenIsZero(): void
+    public function test_detects_a_worker_even_when_test_token_is_zero(): void
     {
         // paratest sets it to a worker index — 0 is a valid token (falsy string, but present)
         // and must still count as set; this is exactly why isWorker() checks !== false

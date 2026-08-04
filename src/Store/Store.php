@@ -17,18 +17,16 @@ use SplFileInfo;
  */
 final class Store
 {
-    /** @var array<class-string, array<string, TestRecord>> */
+    /** @var array<string, array<string, TestRecord>> */
     private array $shards = [];
 
-    /** @var array<class-string, true> */
+    /** @var array<string, true> */
     private array $loaded = [];
 
-    /** @var array<class-string, true> */
+    /** @var array<string, true> */
     private array $dirty = [];
 
-    public function __construct(private readonly string $directory)
-    {
-    }
+    public function __construct(private readonly string $directory) {}
 
     public function get(string $class, string $testKey): ?TestRecord
     {
@@ -49,7 +47,7 @@ final class Store
     {
         $this->load($class);
 
-        if (!isset($this->shards[$class][$testKey])) {
+        if (! isset($this->shards[$class][$testKey])) {
             return;
         }
 
@@ -77,14 +75,19 @@ final class Store
      * Caller must only invoke this on a full run (see Engine::isFullRun()): a partial or
      * parallel run only observes a subset of the suite and would wrongly prune the rest.
      *
-     * @param array<string, true> $observedIds every test id actually seen (ran or skipped) this pass
+     * @param  array<string, true>  $observedIds  every test id actually seen (ran or skipped) this pass
      */
     public function pruneStaleRecords(array $observedIds): void
     {
-        foreach (glob($this->directory . '/tests/*.json') ?: [] as $shardFile) {
+        foreach (glob($this->directory.'/tests/*.json') ?: [] as $shardFile) {
             $decoded = json_decode((string) file_get_contents($shardFile), true);
-
-            if (!is_array($decoded) || !isset($decoded['class'], $decoded['tests']) || !is_array($decoded['tests'])) {
+            if (! is_array($decoded)) {
+                continue;
+            }
+            if (! isset($decoded['class'], $decoded['tests'])) {
+                continue;
+            }
+            if (! is_array($decoded['tests'])) {
                 continue;
             }
 
@@ -92,7 +95,7 @@ final class Store
             $this->load($class);
 
             foreach (array_keys($this->shards[$class] ?? []) as $testKey) {
-                if (!isset($observedIds[$class . '::' . $testKey])) {
+                if (! isset($observedIds[$class.'::'.$testKey])) {
                     $this->drop($class, $testKey);
                 }
             }
@@ -110,19 +113,59 @@ final class Store
 
         $file = $this->shardFile($class);
 
-        if (!is_file($file)) {
+        if (! is_file($file)) {
             return;
         }
 
         $decoded = json_decode((string) file_get_contents($file), true);
 
-        if (!is_array($decoded) || ($decoded['class'] ?? null) !== $class || !is_array($decoded['tests'] ?? null)) {
+        if (! is_array($decoded) || ($decoded['class'] ?? null) !== $class || ! is_array($decoded['tests'] ?? null)) {
             return; // corrupt or hash-collided shard: treat as empty, it will be rebuilt
         }
 
         foreach ($decoded['tests'] as $testKey => $record) {
-            $this->shards[$class][(string) $testKey] = TestRecord::fromArray($record);
+            $shape = $this->recordShape($record);
+
+            if ($shape === null) {
+                continue; // corrupt individual record: drop it, it will be rebuilt
+            }
+
+            $this->shards[$class][(string) $testKey] = TestRecord::fromArray($shape);
         }
+    }
+
+    /**
+     * Validates a single json_decode()d record against TestRecord::fromArray()'s expected
+     * shape, since the file on disk is untrusted input (hand-edited, truncated, hash-collided
+     * class name, or from a future/older shard format).
+     *
+     * @return array{files: array<string, string>, duration: float, result: string}|null
+     */
+    private function recordShape(mixed $record): ?array
+    {
+        if (! is_array($record) || ! is_array($record['files'] ?? null) || ! is_string($record['result'] ?? null)) {
+            return null;
+        }
+
+        if (! is_int($record['duration'] ?? null) && ! is_float($record['duration'] ?? null)) {
+            return null;
+        }
+
+        $files = [];
+
+        foreach ($record['files'] as $path => $hash) {
+            if (! is_string($path) || ! is_string($hash)) {
+                return null;
+            }
+
+            $files[$path] = $hash;
+        }
+
+        return [
+            'files' => $files,
+            'duration' => (float) $record['duration'],
+            'result' => $record['result'],
+        ];
     }
 
     private function writeShard(string $class): void
@@ -140,7 +183,7 @@ final class Store
 
         $directory = dirname($file);
 
-        if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
+        if (! is_dir($directory) && ! @mkdir($directory, 0775, true) && ! is_dir($directory)) {
             throw new RuntimeException("Zefram could not create cache directory: {$directory}");
         }
 
@@ -149,9 +192,9 @@ final class Store
             'tests' => array_map(static fn (TestRecord $r): array => $r->toArray(), $records),
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-        $temp = $file . '.' . getmypid() . '.tmp';
+        $temp = $file.'.'.getmypid().'.tmp';
 
-        if (@file_put_contents($temp, $payload) === false || !@rename($temp, $file)) {
+        if (@file_put_contents($temp, $payload) === false || ! @rename($temp, $file)) {
             @unlink($temp);
 
             throw new RuntimeException("Zefram could not write shard: {$file}");
@@ -160,7 +203,7 @@ final class Store
 
     private function shardFile(string $class): string
     {
-        return $this->directory . '/tests/' . hash('xxh128', $class) . '.json';
+        return $this->directory.'/tests/'.hash('xxh128', $class).'.json';
     }
 
     /**
@@ -174,7 +217,7 @@ final class Store
      */
     public static function pruneSiblings(string $cacheRoot, string $currentFingerprint): void
     {
-        foreach (glob(rtrim($cacheRoot, '/') . '/*', GLOB_ONLYDIR) ?: [] as $dir) {
+        foreach (glob(rtrim($cacheRoot, '/').'/*', GLOB_ONLYDIR) ?: [] as $dir) {
             if (basename($dir) !== $currentFingerprint) {
                 self::removeDirectory($dir);
             }
@@ -183,7 +226,7 @@ final class Store
 
     private static function removeDirectory(string $dir): void
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return;
         }
 

@@ -15,11 +15,9 @@ use Vusys\Zefram\Store\TestRecord;
  * aggregate stored duration — the same underlying number #10's warp factor uses, computed
  * standalone here without a live PHPUnit run.
  */
-final class StatsCommand implements Command
+final readonly class StatsCommand implements Command
 {
-    public function __construct(private readonly string $projectRoot)
-    {
-    }
+    public function __construct(private string $projectRoot) {}
 
     public function run(array $args): int
     {
@@ -27,8 +25,8 @@ final class StatsCommand implements Command
         $stats = $this->collect($fingerprint);
 
         echo in_array('--json', $args, true)
-            ? self::renderJson($fingerprint, $stats)
-            : self::renderText($fingerprint, $stats);
+            ? $this->renderJson($fingerprint, $stats)
+            : $this->renderText($fingerprint, $stats);
 
         return 0;
     }
@@ -42,17 +40,22 @@ final class StatsCommand implements Command
         $eligible = 0;
         $duration = 0.0;
 
-        $shardDirectory = ProjectConfig::cachePath($this->projectRoot) . '/' . $fingerprint . '/tests';
+        $shardDirectory = ProjectConfig::cachePath($this->projectRoot).'/'.$fingerprint.'/tests';
 
-        foreach (glob($shardDirectory . '/*.json') ?: [] as $shardFile) {
+        foreach (glob($shardDirectory.'/*.json') ?: [] as $shardFile) {
             $decoded = json_decode((string) file_get_contents($shardFile), true);
-
-            if (!is_array($decoded) || !isset($decoded['tests']) || !is_array($decoded['tests'])) {
+            if (! is_array($decoded)) {
+                continue;
+            }
+            if (! isset($decoded['tests'])) {
+                continue;
+            }
+            if (! is_array($decoded['tests'])) {
                 continue;
             }
 
             foreach ($decoded['tests'] as $record) {
-                if (!is_array($record)) {
+                if (! is_array($record)) {
                     continue;
                 }
 
@@ -62,7 +65,8 @@ final class StatsCommand implements Command
                     $eligible++;
                 }
 
-                $duration += (float) ($record['duration'] ?? 0.0);
+                $rawDuration = $record['duration'] ?? 0.0;
+                $duration += is_int($rawDuration) || is_float($rawDuration) ? (float) $rawDuration : 0.0;
             }
         }
 
@@ -74,9 +78,9 @@ final class StatsCommand implements Command
     }
 
     /**
-     * @param array{trackedTests: int, eligibleToSkip: int, recordedDurationSeconds: float} $stats
+     * @param  array{trackedTests: int, eligibleToSkip: int, recordedDurationSeconds: float}  $stats
      */
-    private static function renderText(string $fingerprint, array $stats): string
+    private function renderText(string $fingerprint, array $stats): string
     {
         if ($stats['trackedTests'] === 0) {
             return "Zefram stats (fingerprint {$fingerprint}): no tests tracked yet.\n";
@@ -85,9 +89,9 @@ final class StatsCommand implements Command
         $percent = (int) round($stats['eligibleToSkip'] / $stats['trackedTests'] * 100);
 
         return sprintf(
-            "Zefram stats (fingerprint %s)\n" .
-            "  Tracked tests:     %d\n" .
-            "  Eligible to skip:  %d (%d%%)\n" .
+            "Zefram stats (fingerprint %s)\n".
+            "  Tracked tests:     %d\n".
+            "  Eligible to skip:  %d (%d%%)\n".
             "  Recorded duration: %.1fs (sum of stored per-test durations, from each test's last real run)\n",
             $fingerprint,
             $stats['trackedTests'],
@@ -98,13 +102,13 @@ final class StatsCommand implements Command
     }
 
     /**
-     * @param array{trackedTests: int, eligibleToSkip: int, recordedDurationSeconds: float} $stats
+     * @param  array{trackedTests: int, eligibleToSkip: int, recordedDurationSeconds: float}  $stats
      */
-    private static function renderJson(string $fingerprint, array $stats): string
+    private function renderJson(string $fingerprint, array $stats): string
     {
         return json_encode(
             array_merge(['fingerprint' => $fingerprint], $stats),
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION,
-        ) . "\n";
+        )."\n";
     }
 }

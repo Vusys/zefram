@@ -21,11 +21,11 @@ use SplFileInfo;
  * autoloader for that namespace ahead of Composer's, so the framework classes come from
  * the outer vendor/autoload.php while the package-under-test classes come from the copy.
  */
-final class DogfoodRunner
+final readonly class DogfoodRunner
 {
     use ReadsZeframShards;
 
-    public readonly string $root;
+    public string $root;
 
     /** @var list<string> */
     private const DEFAULT_TEST_FILES = ['FileHasherTest.php', 'EngineTest.php', 'StoreTest.php'];
@@ -34,11 +34,11 @@ final class DogfoodRunner
     private const SUPPORT_FILES = ['FakeDriver.php', 'TempProject.php'];
 
     /**
-     * @param list<string> $testFiles filenames under tests/Unit to copy in and run
+     * @param  list<string>  $testFiles  filenames under tests/Unit to copy in and run
      */
-    public function __construct(private readonly array $testFiles = self::DEFAULT_TEST_FILES)
+    public function __construct(private array $testFiles = self::DEFAULT_TEST_FILES)
     {
-        $this->root = sys_get_temp_dir() . '/zefram-dogfood-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir().'/zefram-dogfood-'.bin2hex(random_bytes(8));
 
         $this->setUpCopy();
     }
@@ -50,7 +50,7 @@ final class DogfoodRunner
 
     public function run(): ChildRunResult
     {
-        return (new ChildPhpUnitProcess())->run($this->root, $this->root . '/phpunit.xml');
+        return (new ChildPhpUnitProcess)->run($this->root, $this->root.'/phpunit.xml');
     }
 
     /**
@@ -58,16 +58,16 @@ final class DogfoodRunner
      */
     public function write(string $relativePath, string $content): void
     {
-        file_put_contents($this->root . '/' . $relativePath, $content);
+        file_put_contents($this->root.'/'.$relativePath, $content);
     }
 
     public function read(string $relativePath): string
     {
-        return (string) file_get_contents($this->root . '/' . $relativePath);
+        return (string) file_get_contents($this->root.'/'.$relativePath);
     }
 
     /**
-     * @param callable(string): string $transform
+     * @param  callable(string): string  $transform
      */
     public function mutate(string $relativePath, callable $transform): void
     {
@@ -81,35 +81,35 @@ final class DogfoodRunner
 
     public function destroy(): void
     {
-        self::removeDirectory($this->root);
+        $this->removeDirectory($this->root);
     }
 
     private function setUpCopy(): void
     {
-        mkdir($this->root . '/src', 0775, true);
-        mkdir($this->root . '/tests/Unit', 0775, true);
-        mkdir($this->root . '/tests/Support', 0775, true);
+        mkdir($this->root.'/src', 0775, true);
+        mkdir($this->root.'/tests/Unit', 0775, true);
+        mkdir($this->root.'/tests/Support', 0775, true);
 
         $outerRoot = dirname(__DIR__, 2);
 
-        self::copyDirectory($outerRoot . '/src', $this->root . '/src');
+        $this->copyDirectory($outerRoot.'/src', $this->root.'/src');
 
         foreach ($this->testFiles as $file) {
-            $content = (string) file_get_contents($outerRoot . '/tests/Unit/' . $file);
-            file_put_contents($this->root . '/tests/Unit/' . $file, self::zeframify($content));
+            $content = (string) file_get_contents($outerRoot.'/tests/Unit/'.$file);
+            file_put_contents($this->root.'/tests/Unit/'.$file, $this->zeframify($content));
         }
 
         foreach (self::SUPPORT_FILES as $file) {
-            copy($outerRoot . '/tests/Support/' . $file, $this->root . '/tests/Support/' . $file);
+            copy($outerRoot.'/tests/Support/'.$file, $this->root.'/tests/Support/'.$file);
         }
 
-        file_put_contents($this->root . '/bootstrap.php', $this->renderBootstrap($outerRoot));
-        file_put_contents($this->root . '/phpunit.xml', $this->renderPhpUnitConfig());
+        file_put_contents($this->root.'/bootstrap.php', $this->renderBootstrap($outerRoot));
+        file_put_contents($this->root.'/phpunit.xml', $this->renderPhpUnitConfig());
     }
 
     private function renderBootstrap(string $outerRoot): string
     {
-        $outerAutoload = addslashes($outerRoot . '/vendor/autoload.php');
+        $outerAutoload = addslashes($outerRoot.'/vendor/autoload.php');
         $copyRoot = addslashes($this->root);
 
         return <<<PHP
@@ -176,7 +176,7 @@ PHP;
 XML;
     }
 
-    private static function copyDirectory(string $from, string $to): void
+    private function copyDirectory(string $from, string $to): void
     {
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($from, FilesystemIterator::SKIP_DOTS),
@@ -186,10 +186,10 @@ XML;
         foreach ($iterator as $item) {
             assert($item instanceof SplFileInfo);
 
-            $target = $to . '/' . substr($item->getPathname(), strlen($from) + 1);
+            $target = $to.'/'.substr($item->getPathname(), strlen($from) + 1);
 
             if ($item->isDir()) {
-                if (!is_dir($target)) {
+                if (! is_dir($target)) {
                     mkdir($target, 0775, true);
                 }
             } else {
@@ -206,7 +206,7 @@ XML;
      * normal PHP method resolution — see ZeframAware's own docblock and #20), also inserts
      * the documented `$this->zeframSetUp();` as that method's first statement.
      */
-    private static function zeframify(string $content): string
+    private function zeframify(string $content): string
     {
         $content = (string) preg_replace(
             '/^use PHPUnit\\\\Framework\\\\TestCase;$/m',
@@ -217,24 +217,22 @@ XML;
 
         $content = (string) preg_replace(
             '/((?:final\s+)?class\s+\w+\s+extends\s+TestCase\s*\n\{\n)/',
-            '$1    use ZeframAware;' . "\n\n",
+            '$1    use ZeframAware;'."\n\n",
             $content,
             1,
         );
 
-        $content = (string) preg_replace(
+        return (string) preg_replace(
             '/(protected function setUp\(\): void\s*\n\s*\{\n)/',
-            '$1        $this->zeframSetUp();' . "\n\n",
+            '$1        $this->zeframSetUp();'."\n\n",
             $content,
             1,
         );
-
-        return $content;
     }
 
-    private static function removeDirectory(string $dir): void
+    private function removeDirectory(string $dir): void
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return;
         }
 

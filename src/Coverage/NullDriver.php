@@ -16,9 +16,7 @@ final class NullDriver implements CoverageDriver
         return false;
     }
 
-    public function start(): void
-    {
-    }
+    public function start(): void {}
 
     public function stop(): array
     {

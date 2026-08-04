@@ -30,7 +30,7 @@ final class JUnitReport
     }
 
     /**
-     * @param list<TestOutcome> $outcomes
+     * @param  list<TestOutcome>  $outcomes
      */
     private static function walk(SimpleXMLElement $node, array &$outcomes): void
     {
@@ -44,11 +44,11 @@ final class JUnitReport
 
             $status = TestOutcome::PASSED;
 
-            if (isset($case->skipped)) {
+            if (property_exists($case, 'skipped') && $case->skipped !== null) {
                 $status = TestOutcome::SKIPPED;
-            } elseif (isset($case->error)) {
+            } elseif (property_exists($case, 'error') && $case->error !== null) {
                 $status = TestOutcome::ERRORED;
-            } elseif (isset($case->failure)) {
+            } elseif (property_exists($case, 'failure') && $case->failure !== null) {
                 $status = TestOutcome::FAILED;
             }
 

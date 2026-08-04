@@ -26,7 +26,7 @@ final class Fingerprint
             'php' => PHP_VERSION,
             'zefram' => $engineVersion,
             'driver' => $driverName,
-            'composer.lock' => $hasher->hash($root . '/composer.lock'),
+            'composer.lock' => $hasher->hash($root.'/composer.lock'),
             'phpunit' => $config->configurationFile !== null ? $hasher->hash($config->configurationFile) : null,
             'watched' => self::watchedHashes($config, $hasher, $root),
         ];
@@ -61,24 +61,24 @@ final class Fingerprint
      */
     private static function expand(string $root, string $pattern): array
     {
-        if (!str_contains($pattern, '**')) {
-            return array_values(array_filter(glob($root . '/' . $pattern) ?: [], is_file(...)));
+        if (! str_contains($pattern, '**')) {
+            return array_values(array_filter(glob($root.'/'.$pattern) ?: [], is_file(...)));
         }
 
         // walk only the fixed directory prefix before the first wildcard
         $fixed = substr($pattern, 0, strcspn($pattern, '*?'));
         $lastSlash = strrpos($fixed, '/');
-        $baseDir = $root . ($lastSlash === false ? '' : '/' . substr($fixed, 0, $lastSlash));
+        $baseDir = $root.($lastSlash === false ? '' : '/'.substr($fixed, 0, $lastSlash));
 
-        if (!is_dir($baseDir)) {
+        if (! is_dir($baseDir)) {
             return [];
         }
 
-        $regex = '#^' . str_replace(
+        $regex = '#^'.str_replace(
             ['\*\*/', '\*\*', '\*', '\?'],
             ['(?:.*/)?', '.*', '[^/]*', '[^/]'],
             preg_quote($pattern, '#'),
-        ) . '$#';
+        ).'$#';
 
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($baseDir, FilesystemIterator::SKIP_DOTS),
@@ -89,7 +89,7 @@ final class Fingerprint
         foreach ($iterator as $file) {
             assert($file instanceof SplFileInfo);
 
-            if (!$file->isFile()) {
+            if (! $file->isFile()) {
                 continue;
             }
 

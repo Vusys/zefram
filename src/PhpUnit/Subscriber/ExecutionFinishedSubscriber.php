@@ -10,9 +10,7 @@ use Vusys\Zefram\Engine;
 
 final readonly class ExecutionFinishedSubscriber implements ExecutionFinishedSubscriberInterface
 {
-    public function __construct(private Engine $engine)
-    {
-    }
+    public function __construct(private Engine $engine) {}
 
     public function notify(ExecutionFinished $event): void
     {
@@ -22,8 +20,8 @@ final readonly class ExecutionFinishedSubscriber implements ExecutionFinishedSub
         // each printing its own summary line interleaves and mangles the terminal output
         // (#12). finish() still runs in full (flush, pruning already gated off under
         // paratest via Engine::isFullRun() — see #11); only the print is suppressed.
-        if ($summary !== null && !$this->engine->isParatestWorker()) {
-            print PHP_EOL . $summary . PHP_EOL;
+        if ($summary !== null && ! $this->engine->isParatestWorker()) {
+            echo PHP_EOL.$summary.PHP_EOL;
         }
     }
 }

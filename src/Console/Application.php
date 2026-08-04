@@ -11,12 +11,12 @@ use Vusys\Zefram\Console\Command\StatsCommand;
  * A thin $argv dispatcher for `vendor/bin/zefram <command>` — no framework needed, PHPUnit
  * itself isn't a dependency for running this.
  */
-final class Application
+final readonly class Application
 {
     /** @var array<string, Command> */
-    private readonly array $commands;
+    private array $commands;
 
-    public function __construct(private readonly string $projectRoot = '')
+    public function __construct(private string $projectRoot = '')
     {
         $projectRoot = $this->projectRoot !== '' ? $this->projectRoot : (string) getcwd();
 
@@ -27,7 +27,7 @@ final class Application
     }
 
     /**
-     * @param list<string> $argv the full $argv, including the script name at index 0
+     * @param  list<string>  $argv  the full $argv, including the script name at index 0
      */
     public function run(array $argv): int
     {
@@ -39,8 +39,8 @@ final class Application
             return 1;
         }
 
-        if (!isset($this->commands[$name])) {
-            fwrite(STDERR, "zefram: unknown command \"{$name}\"\n\n" . $this->usage());
+        if (! isset($this->commands[$name])) {
+            fwrite(STDERR, "zefram: unknown command \"{$name}\"\n\n".$this->usage());
 
             return 1;
         }
@@ -52,6 +52,6 @@ final class Application
     {
         $lines = array_map(static fn (string $name): string => "  {$name}", array_keys($this->commands));
 
-        return "Usage: zefram <command>\n\nAvailable commands:\n" . implode("\n", $lines) . "\n";
+        return "Usage: zefram <command>\n\nAvailable commands:\n".implode("\n", $lines)."\n";
     }
 }

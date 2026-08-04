@@ -48,7 +48,7 @@ trait ZeframAware
 
     // After-hooks also run for tests skipped from setUp(); stopCapture() tolerates a
     // window that was never opened.
-    #[After(priority: PHP_INT_MIN)]
+    #[After(PHP_INT_MIN)]
     protected function zeframAfter(): void
     {
         Zefram::stopCapture();

@@ -12,15 +12,14 @@ namespace Vusys\Zefram\Tests\Support;
 final readonly class Node
 {
     /**
-     * @param list<string> $dependencies
+     * @param  list<string>  $dependencies
      */
     public function __construct(
         public string $name,
         public array $dependencies = [],
         public ?int $expensiveMicroseconds = null,
         public string $extraRunCode = '',
-    ) {
-    }
+    ) {}
 
     public function withExtraRunCode(string $extraRunCode): self
     {
