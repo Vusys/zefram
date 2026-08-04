@@ -21,10 +21,17 @@
             "Vusys\\Zefram\\Tests\\": "tests/"
         }
     },
+    "bin": [
+        "bin/zefram"
+    ],
     "config": {
         "sort-packages": true
     },
     "scripts": {
-        "test": "phpunit"
+        "test": "phpunit",
+        "test:e2e": "phpunit --testsuite e2e"
+    },
+    "require-dev": {
+        "brianium/paratest": "^7.20"
     }
 }

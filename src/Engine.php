@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vusys\Zefram;
 
+use Closure;
 use ReflectionClass;
 use ReflectionMethod;
 use Vusys\Zefram\Attribute\NeverSkip;
@@ -31,18 +32,45 @@ final class Engine
     /** @var array<string, true> */
     private array $selfSkipped = [];
 
+    /**
+     * Every test id actually seen (ran or skipped) this pass — shouldSkip() is the trait's
+     * universal entry point, called exactly once per test regardless of outcome, so it is
+     * where #7's stale-record pruning gets its "what's still real" set.
+     *
+     * @var array<string, true>
+     */
+    private array $observed = [];
+
     private int $testsSeen = 0;
 
     private int $skipped = 0;
 
     private float $timeSaved = 0.0;
 
+    /**
+     * Sum of stopCapture()'s real measured duration for every test that actually ran this
+     * pass (any outcome — pass, fail, error, risky, incomplete, foreign-skip-after-running),
+     * as opposed to $timeSaved, which is stored duration for tests we skipped. Together
+     * these are the numerator of the "warp factor" (#10): what this pass would have cost at
+     * sublight, versus $elapsed, what it actually cost.
+     */
+    private float $ranDuration = 0.0;
+
+    private readonly Closure $clock;
+
+    private readonly int $startedAt;
+
     public function __construct(
         private readonly Config $config,
         private readonly CoverageDriver $driver,
         private readonly Store $store,
         private readonly FileHasher $hasher,
+        private readonly string $fingerprint = '',
+        ?Closure $clock = null,
     ) {
+        // injectable for deterministic warp-factor tests; real usage always gets hrtime()
+        $this->clock = $clock ?? static fn (): int => hrtime(true);
+        $this->startedAt = ($this->clock)();
     }
 
     public static function create(Config $config, ?CoverageDriver $driver = null): self
@@ -52,18 +80,20 @@ final class Engine
         $fingerprint = Fingerprint::compute($config, $driver->name(), self::VERSION, $hasher);
         $store = new Store($config->cachePath() . '/' . $fingerprint);
 
-        return new self($config, $driver, $store, $hasher);
+        return new self($config, $driver, $store, $hasher, $fingerprint);
     }
 
     public function shouldSkip(string $class, string $method, int|string $dataName): bool
     {
         $this->testsSeen++;
 
+        $key = self::testKey($method, $dataName);
+        $this->observed[self::id($class, $key)] = true;
+
         if (!$this->active() || $this->neverSkips($class, $method)) {
             return false;
         }
 
-        $key = self::testKey($method, $dataName);
         $record = $this->store->get($class, $key);
 
         if ($record === null || $record->result !== TestRecord::RESULT_PASSED || $record->files === []) {
@@ -111,6 +141,7 @@ final class Engine
             'files' => $this->hashProjectFiles($files),
             'duration' => $duration,
         ];
+        $this->ranDuration += $duration;
 
         $this->current = null;
     }
@@ -162,7 +193,18 @@ final class Engine
 
     public function finish(): ?string
     {
+        $fullRun = $this->active() && $this->isFullRun();
+
+        if ($fullRun) {
+            // must run before flush() so the drops persist (#7)
+            $this->store->pruneStaleRecords($this->observed);
+        }
+
         $this->store->flush();
+
+        if ($fullRun) {
+            Store::pruneSiblings($this->config->cachePath(), $this->fingerprint);
+        }
 
         if (!$this->config->enabled || $this->testsSeen === 0) {
             return null;
@@ -173,11 +215,55 @@ final class Engine
         }
 
         return sprintf(
-            'Zefram: skipped %d of %d tests (~%s at sublight)',
+            'Zefram: skipped %d of %d tests (~%s at sublight, warp factor %.1f)',
             $this->skipped,
             $this->testsSeen,
             self::formatSeconds($this->timeSaved),
+            $this->warpFactor(),
         );
+    }
+
+    /**
+     * (sum of stored duration for every skipped test, i.e. what it cost the last time it
+     * actually ran, plus the real measured duration of every test that did run this pass)
+     * divided by (the actual measured wall time of this pass). ~1.0 with nothing skipped;
+     * heavy skipping pushes it up. A real computed number, not illustrative text.
+     */
+    public function warpFactor(): float
+    {
+        $elapsed = (($this->clock)() - $this->startedAt) / 1_000_000_000;
+
+        if ($elapsed <= 0.0) {
+            return 1.0;
+        }
+
+        return ($this->ranDuration + $this->timeSaved) / $elapsed;
+    }
+
+    /**
+     * Unfiltered, non-grouped, non-parallel — see #20's correctness guards. Only safe
+     * condition to prune stale cache state under (#6 fingerprint directories, #7 stale
+     * per-test records): a partial or parallel run must never delete state another process
+     * or a later un-filtered run might still need. Computed once by ZeframExtension from
+     * PHPUnit's Configuration + TEST_TOKEN; defaults false on a directly-constructed Engine.
+     * Also unconditionally false under paratest regardless of what \$config->fullRun says —
+     * a structural guarantee (#11) rather than trusting every caller to have already
+     * factored isParatestWorker() into fullRun themselves.
+     */
+    public function isFullRun(): bool
+    {
+        return $this->config->fullRun && !$this->config->paratestWorker;
+    }
+
+    /**
+     * Paratest sets TEST_TOKEN in every worker process it spawns (see Vusys\Zefram\Paratest,
+     * #11). A worker only ever sees a partial view of the suite (paratest's default
+     * WrapperRunner distributes work per test class), which #12's per-worker summary
+     * suppression also keys off.
+     */
+    public function isParatestWorker(): bool
+    {
+        return $this->config->paratestWorker;
     }
 
     private function active(): bool

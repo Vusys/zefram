@@ -19,7 +19,11 @@ final class FileHasherTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->project->destroy();
+        // setUp() may throw before $project is assigned — tearDown() still runs, so guard
+        // the typed property (see EngineTest for the same pattern).
+        if (isset($this->project)) {
+            $this->project->destroy();
+        }
     }
 
     public function testHashesFileContent(): void

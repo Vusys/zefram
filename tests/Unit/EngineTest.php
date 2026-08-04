@@ -10,6 +10,7 @@ use Vusys\Zefram\Config;
 use Vusys\Zefram\Engine;
 use Vusys\Zefram\Hash\FileHasher;
 use Vusys\Zefram\Store\Store;
+use Vusys\Zefram\Store\TestRecord;
 use Vusys\Zefram\Tests\Support\FakeDriver;
 use Vusys\Zefram\Tests\Support\TempProject;
 
@@ -37,7 +38,11 @@ final class EngineTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->project->destroy();
+        // setUp() may throw before $project is assigned (e.g. a test skipped upstream of
+        // TempProject construction) — tearDown() still runs, so guard the typed property.
+        if (isset($this->project)) {
+            $this->project->destroy();
+        }
     }
 
     public function testFirstRunNeverSkips(): void
@@ -196,6 +201,145 @@ final class EngineTest extends TestCase
 
         $this->assertNotNull($summary);
         $this->assertStringContainsString('skipped 1 of 1', $summary);
+        $this->assertMatchesRegularExpression('/warp factor \d+\.\d/', $summary);
+    }
+
+    public function testWarpFactorComputesRatioOfEstimatedFullRunToActualElapsed(): void
+    {
+        $config = new Config(enabled: true, projectRoot: $this->project->root);
+        $hasher = new FileHasher();
+
+        // seed a known "last recorded duration" for a test that will be skipped this pass
+        $store = new Store($config->cachePath() . '/fp');
+        $store->put(self::TEST_CLASS, 'testEngage', new TestRecord(
+            files: [
+                'src/WarpCore.php' => $hasher->hash($this->project->path('src/WarpCore.php')),
+                'tests/WarpCoreTest.php' => $hasher->hash($this->project->path('tests/WarpCoreTest.php')),
+            ],
+            duration: 4.0,
+            result: TestRecord::RESULT_PASSED,
+        ));
+        $store->flush();
+
+        // deterministic clock: construction sees t=0, warpFactor() sees t=10s later
+        $times = [0, 10_000_000_000];
+        $i = 0;
+        $clock = static function () use (&$times, &$i): int {
+            return $times[$i++] ?? end($times);
+        };
+
+        $engine = new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp', $clock);
+
+        $this->assertTrue($engine->shouldSkip(self::TEST_CLASS, 'testEngage', ''), 'sanity: the seeded record must actually be skippable');
+
+        // (4.0s stored duration for the one skipped test + 0s for anything that actually
+        // ran) / 10s elapsed = 0.4
+        $this->assertEqualsWithDelta(0.4, $engine->warpFactor(), 0.0001);
+    }
+
+    public function testWarpFactorIsOneWhenElapsedTimeIsZero(): void
+    {
+        $clock = static fn (): int => 5_000_000_000; // constant: construction and warpFactor() see the same instant
+        $config = new Config(enabled: true, projectRoot: $this->project->root);
+
+        $engine = new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp', $clock);
+
+        $this->assertSame(1.0, $engine->warpFactor());
+    }
+
+    public function testIsFullRunReflectsConfig(): void
+    {
+        $this->assertFalse($this->engine(fullRun: false)->isFullRun());
+        $this->assertTrue($this->engine(fullRun: true)->isFullRun());
+    }
+
+    public function testFullRunPrunesStaleFingerprintDirectoriesOnFinish(): void
+    {
+        $this->runAndPass('testEngage'); // populates .zefram/fp on disk
+
+        // a stale fingerprint directory left behind by an earlier config change (see #6)
+        $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
+
+        $this->engine(fullRun: true)->finish();
+
+        $this->assertDirectoryDoesNotExist($this->project->path('.zefram/stale-fingerprint'));
+        $this->assertDirectoryExists($this->project->path('.zefram/fp'), 'the current fingerprint must survive its own prune');
+    }
+
+    public function testFullRunPrunesRecordsForTestsThatNoLongerExist(): void
+    {
+        $this->runAndPass('testEngage');
+        $this->runAndPass('testBeam', 'two to beam up'); // simulates a method later renamed/deleted
+
+        // a full-run pass that only observes testEngage — testBeam is never seen (ran or
+        // skipped) this time, exactly as if it had been removed from the class
+        $engine = $this->engine(fullRun: true);
+        $engine->shouldSkip(self::TEST_CLASS, 'testEngage', '');
+        $engine->finish();
+
+        $this->assertTrue($this->engine()->shouldSkip(self::TEST_CLASS, 'testEngage', ''), 'still-observed test keeps its record');
+        $this->assertFalse($this->engine()->shouldSkip(self::TEST_CLASS, 'testBeam', 'two to beam up'), 'the vanished method\'s record must have been pruned');
+    }
+
+    public function testNonFullRunNeverPrunesStaleRecords(): void
+    {
+        $this->runAndPass('testEngage');
+        $this->runAndPass('testBeam', 'two to beam up');
+
+        // filtered/grouped/paratest run: only testEngage observed, but fullRun is false
+        $engine = $this->engine(fullRun: false);
+        $engine->shouldSkip(self::TEST_CLASS, 'testEngage', '');
+        $engine->finish();
+
+        $this->assertTrue(
+            $this->engine()->shouldSkip(self::TEST_CLASS, 'testBeam', 'two to beam up'),
+            'a non-full-run pass must never prune records for tests it simply did not touch',
+        );
+    }
+
+    public function testNonFullRunNeverPrunesFingerprintDirectories(): void
+    {
+        $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
+
+        $this->engine(fullRun: false)->finish();
+
+        $this->assertDirectoryExists($this->project->path('.zefram/stale-fingerprint'), 'a filtered/grouped/paratest run must never prune');
+    }
+
+    public function testDisabledEngineNeverPrunesEvenOnAFullRun(): void
+    {
+        $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
+
+        $this->engine(enabled: false, fullRun: true)->finish();
+
+        $this->assertDirectoryExists($this->project->path('.zefram/stale-fingerprint'));
+    }
+
+    public function testIsParatestWorkerReflectsConfig(): void
+    {
+        $this->assertFalse($this->engine()->isParatestWorker());
+        $this->assertTrue($this->engine(paratestWorker: true)->isParatestWorker());
+    }
+
+    public function testIsFullRunIsFalseUnderParatestEvenWhenOtherwiseAFullRun(): void
+    {
+        // a structural guarantee (#11): paratestWorker forces isFullRun() false regardless
+        // of what fullRun alone says, so pruning never trusts a caller to have already
+        // combined the two conditions correctly.
+        $this->assertFalse($this->engine(fullRun: true, paratestWorker: true)->isFullRun());
+        $this->assertTrue($this->engine(fullRun: true, paratestWorker: false)->isFullRun());
+    }
+
+    public function testParatestWorkerNeverPrunesEvenOnAnOtherwiseFullRun(): void
+    {
+        $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
+
+        $this->engine(fullRun: true, paratestWorker: true)->finish();
+
+        $this->assertDirectoryExists(
+            $this->project->path('.zefram/stale-fingerprint'),
+            'a paratest worker only sees a partial view of the suite and must never prune',
+        );
     }
 
     private function runAndPass(string $method, int|string $dataName = ''): void
@@ -213,17 +357,19 @@ final class EngineTest extends TestCase
     /**
      * @param list<string> $neverSkip
      */
-    private function engine(bool $enabled = true, array $neverSkip = []): Engine
+    private function engine(bool $enabled = true, array $neverSkip = [], bool $fullRun = false, bool $paratestWorker = false): Engine
     {
         $config = new Config(
             enabled: $enabled,
             projectRoot: $this->project->root,
             neverSkip: $neverSkip,
+            fullRun: $fullRun,
+            paratestWorker: $paratestWorker,
         );
 
         // fresh store + hasher per engine simulates a new process; fixed fingerprint keeps
         // the cache namespace stable across the simulated runs
-        return new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher());
+        return new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp');
     }
 }
 
