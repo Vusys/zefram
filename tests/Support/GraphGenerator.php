@@ -8,6 +8,7 @@ use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
+use SplFileInfo;
 
 /**
  * Generates a small, real PHP class graph plus matching PHPUnit test classes, parameterized
@@ -35,11 +36,11 @@ final class GraphGenerator
 
     public function __construct(?string $namespace = null)
     {
-        $this->namespace = $namespace ?? 'Zefram\\Generated\\G' . bin2hex(random_bytes(6));
-        $this->root = sys_get_temp_dir() . '/zefram-graph-' . bin2hex(random_bytes(8));
+        $this->namespace = $namespace ?? 'Zefram\\Generated\\G'.bin2hex(random_bytes(6));
+        $this->root = sys_get_temp_dir().'/zefram-graph-'.bin2hex(random_bytes(8));
 
-        mkdir($this->root . '/src', 0775, true);
-        mkdir($this->root . '/tests', 0775, true);
+        mkdir($this->root.'/src', 0775, true);
+        mkdir($this->root.'/tests', 0775, true);
     }
 
     /**
@@ -47,7 +48,7 @@ final class GraphGenerator
      * meaning C depends on A and B. Order does not matter; dependencies may be declared
      * after their dependents.
      *
-     * @param array<string, list<string>> $edges
+     * @param  array<string, list<string>>  $edges
      */
     public static function fromEdges(array $edges, ?string $namespace = null): self
     {
@@ -61,12 +62,12 @@ final class GraphGenerator
     }
 
     /**
-     * @param list<string> $dependencies must already have been added
+     * @param  list<string>  $dependencies  must already have been added
      */
     public function addNode(string $name, array $dependencies = [], ?int $expensiveMicroseconds = null): self
     {
         foreach ($dependencies as $dependency) {
-            if (!isset($this->nodes[$dependency])) {
+            if (! isset($this->nodes[$dependency])) {
                 throw new RuntimeException("Zefram GraphGenerator: node '{$name}' depends on unknown node '{$dependency}'; add it first.");
             }
         }
@@ -94,32 +95,32 @@ final class GraphGenerator
 
     public function classFqcn(string $name): string
     {
-        return $this->namespace . '\\' . $name;
+        return $this->namespace.'\\'.$name;
     }
 
     public function testFqcn(string $name): string
     {
-        return $this->namespace . '\\Tests\\' . $name . 'Test';
+        return $this->namespace.'\\Tests\\'.$name.'Test';
     }
 
     public function sourcePath(string $name): string
     {
-        return $this->root . '/src/' . $name . '.php';
+        return $this->root.'/src/'.$name.'.php';
     }
 
     public function testPath(string $name): string
     {
-        return $this->root . '/tests/' . $name . 'Test.php';
+        return $this->root.'/tests/'.$name.'Test.php';
     }
 
     public function bootstrapPath(): string
     {
-        return $this->root . '/bootstrap.php';
+        return $this->root.'/bootstrap.php';
     }
 
     public function setupLogPath(): string
     {
-        return $this->root . '/setup.log';
+        return $this->root.'/setup.log';
     }
 
     /**
@@ -128,7 +129,7 @@ final class GraphGenerator
      */
     public function setupRunCount(string $name): int
     {
-        if (!is_file($this->setupLogPath())) {
+        if (! is_file($this->setupLogPath())) {
             return 0;
         }
 
@@ -172,7 +173,7 @@ final class GraphGenerator
 
             foreach ($frontier as $current) {
                 foreach ($this->directDependentsOf($current) as $dependent) {
-                    if (!in_array($dependent, $found, true)) {
+                    if (! in_array($dependent, $found, true)) {
                         $found[] = $dependent;
                         $next[] = $dependent;
                     }
@@ -209,7 +210,7 @@ final class GraphGenerator
 
     public function destroy(): void
     {
-        if (!is_dir($this->root)) {
+        if (! is_dir($this->root)) {
             return;
         }
 
@@ -219,6 +220,7 @@ final class GraphGenerator
         );
 
         foreach ($iterator as $item) {
+            assert($item instanceof SplFileInfo);
             $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
         }
 
@@ -227,20 +229,18 @@ final class GraphGenerator
 
     private function renderSource(Node $node): string
     {
-        $fqcn = $this->classFqcn($node->name);
-        $lastSlash = strrpos($fqcn, '\\');
-        $namespace = substr($fqcn, 0, $lastSlash);
+        $namespace = $this->namespace;
 
         $constructorLines = [];
         $propertyLines = [];
 
-        foreach ($node->dependencies as $index => $dependency) {
+        foreach ($node->dependencies as $dependency) {
             $depFqcn = $this->classFqcn($dependency);
             $constructorLines[] = "            new \\{$depFqcn}(),";
             $propertyLines[] = " * @var list<\\{$depFqcn}|object>";
         }
 
-        $dependenciesArray = $constructorLines === [] ? '[]' : "[\n" . implode("\n", $constructorLines) . "\n        ]";
+        $dependenciesArray = $constructorLines === [] ? '[]' : "[\n".implode("\n", $constructorLines)."\n        ]";
 
         $expensiveBlock = '';
 
@@ -265,7 +265,7 @@ declare(strict_types=1);
 
 namespace {$namespace};
 
-final class {$node->name}
+final class {$node->name} implements \Vusys\Zefram\Tests\Support\Runnable
 {
     /** @var list<object> */
     private array \$dependencies;
@@ -291,10 +291,8 @@ PHP;
     private function renderTest(Node $node): string
     {
         $fqcn = $this->classFqcn($node->name);
-        $testFqcn = $this->testFqcn($node->name);
-        $lastSlash = strrpos($testFqcn, '\\');
-        $namespace = substr($testFqcn, 0, $lastSlash);
-        $className = substr($testFqcn, $lastSlash + 1);
+        $namespace = $this->namespace.'\\Tests';
+        $className = $node->name.'Test';
 
         return <<<PHP
 <?php

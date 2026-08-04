@@ -13,14 +13,12 @@ final class FakeDriver implements CoverageDriver
     public int $stops = 0;
 
     /**
-     * @param list<string> $files absolute paths returned from every capture window
+     * @param  list<string>  $files  absolute paths returned from every capture window
      */
-    public function __construct(private array $files = [])
-    {
-    }
+    public function __construct(private array $files = []) {}
 
     /**
-     * @param list<string> $files
+     * @param  list<string>  $files
      */
     public function willReturn(array $files): void
     {

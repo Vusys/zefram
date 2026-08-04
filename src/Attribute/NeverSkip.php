@@ -11,6 +11,4 @@ use Attribute;
  * with dependencies coverage can't see (time, randomness, network, external state).
  */
 #[Attribute(Attribute::TARGET_CLASS | Attribute::TARGET_METHOD)]
-final class NeverSkip
-{
-}
+final class NeverSkip {}

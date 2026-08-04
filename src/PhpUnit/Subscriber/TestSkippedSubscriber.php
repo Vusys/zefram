@@ -11,9 +11,7 @@ use Vusys\Zefram\PhpUnit\TestIdentity;
 
 final readonly class TestSkippedSubscriber implements SkippedSubscriber
 {
-    public function __construct(private Engine $engine)
-    {
-    }
+    public function __construct(private Engine $engine) {}
 
     public function notify(Skipped $event): void
     {

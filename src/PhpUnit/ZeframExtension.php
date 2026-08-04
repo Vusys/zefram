@@ -79,7 +79,7 @@ final class ZeframExtension implements Extension
         $env = getenv('ZEFRAM');
 
         if ($env !== false) {
-            return !in_array(strtolower($env), ['0', 'false', 'off'], true);
+            return ! in_array(strtolower($env), ['0', 'false', 'off'], true);
         }
 
         if ($parameters->has('enabled') && in_array(strtolower($parameters->get('enabled')), ['0', 'false', 'off'], true)) {
@@ -88,11 +88,7 @@ final class ZeframExtension implements Extension
 
         // PHPUnit collecting its own coverage and zefram clearing the pcov buffer per test
         // would corrupt each other — and skipping tests would falsify the report anyway.
-        if ($configuration->hasCoverageReport()) {
-            return false;
-        }
-
-        return true;
+        return ! $configuration->hasCoverageReport();
     }
 
     /**
@@ -131,11 +127,8 @@ final class ZeframExtension implements Extension
 
     private function configurationFile(Configuration $configuration): ?string
     {
-        if (method_exists($configuration, 'hasConfigurationFile') && method_exists($configuration, 'configurationFile')) {
-            return $configuration->hasConfigurationFile() ? $configuration->configurationFile() : null;
-        }
-
-        return null;
+        // Present on both supported PHPUnit majors (confirmed against 11.5.0 and 12.x).
+        return $configuration->hasConfigurationFile() ? $configuration->configurationFile() : null;
     }
 
     /**
@@ -143,7 +136,7 @@ final class ZeframExtension implements Extension
      */
     private function list(ParameterCollection $parameters, string $name): array
     {
-        if (!$parameters->has($name)) {
+        if (! $parameters->has($name)) {
             return [];
         }
 

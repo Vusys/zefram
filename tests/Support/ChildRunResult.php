@@ -11,15 +11,14 @@ namespace Vusys\Zefram\Tests\Support;
 final readonly class ChildRunResult
 {
     /**
-     * @param list<TestOutcome> $outcomes
+     * @param  list<TestOutcome>  $outcomes
      */
     public function __construct(
         public int $exitCode,
         public string $stdout,
         public string $stderr,
         public array $outcomes,
-    ) {
-    }
+    ) {}
 
     public function statusOf(string $id): ?string
     {

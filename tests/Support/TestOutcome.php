@@ -21,11 +21,10 @@ final readonly class TestOutcome
         public string $class,
         public string $method,
         public string $status,
-    ) {
-    }
+    ) {}
 
     public function id(): string
     {
-        return $this->class . '::' . $this->method;
+        return $this->class.'::'.$this->method;
     }
 }

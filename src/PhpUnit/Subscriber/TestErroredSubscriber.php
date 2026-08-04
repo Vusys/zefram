@@ -11,9 +11,7 @@ use Vusys\Zefram\PhpUnit\TestIdentity;
 
 final readonly class TestErroredSubscriber implements ErroredSubscriber
 {
-    public function __construct(private Engine $engine)
-    {
-    }
+    public function __construct(private Engine $engine) {}
 
     public function notify(Errored $event): void
     {

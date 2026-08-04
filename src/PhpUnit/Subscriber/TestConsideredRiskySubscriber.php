@@ -11,9 +11,7 @@ use Vusys\Zefram\PhpUnit\TestIdentity;
 
 final readonly class TestConsideredRiskySubscriber implements ConsideredRiskySubscriber
 {
-    public function __construct(private Engine $engine)
-    {
-    }
+    public function __construct(private Engine $engine) {}
 
     public function notify(ConsideredRisky $event): void
     {

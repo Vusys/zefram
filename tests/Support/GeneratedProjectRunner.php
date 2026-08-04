@@ -15,11 +15,11 @@ namespace Vusys\Zefram\Tests\Support;
  * reuses the *real* installed Zefram classes from the outer vendor/autoload.php: there's no
  * need for a mutable copy of the package's own source here, only of the generated graph.
  */
-final class GeneratedProjectRunner
+final readonly class GeneratedProjectRunner
 {
     use ReadsZeframShards;
 
-    public function __construct(private readonly GraphGenerator $graph)
+    public function __construct(private GraphGenerator $graph)
     {
         $this->graph->write();
         $this->zeframifyGeneratedTests();
@@ -35,7 +35,7 @@ final class GeneratedProjectRunner
 
     public function run(): ChildRunResult
     {
-        return (new ChildPhpUnitProcess())->run($this->graph->root, $this->phpUnitConfigPath());
+        return (new ChildPhpUnitProcess)->run($this->graph->root, $this->phpUnitConfigPath());
     }
 
     public function graph(): GraphGenerator
@@ -55,12 +55,12 @@ final class GeneratedProjectRunner
 
     private function bootstrapPath(): string
     {
-        return $this->graph->root . '/e2e-bootstrap.php';
+        return $this->graph->root.'/e2e-bootstrap.php';
     }
 
     private function phpUnitConfigPath(): string
     {
-        return $this->graph->root . '/phpunit.xml';
+        return $this->graph->root.'/phpunit.xml';
     }
 
     /**
@@ -82,7 +82,7 @@ final class GeneratedProjectRunner
 
             $content = (string) preg_replace(
                 '/((?:final\s+)?class\s+\w+\s+extends\s+TestCase\s*\n\{\n)/',
-                '$1    use ZeframAware;' . "\n\n",
+                '$1    use ZeframAware;'."\n\n",
                 $content,
                 1,
             );
@@ -93,7 +93,7 @@ final class GeneratedProjectRunner
 
     private function renderBootstrap(): string
     {
-        $outerAutoload = addslashes(dirname(__DIR__, 2) . '/vendor/autoload.php');
+        $outerAutoload = addslashes(dirname(__DIR__, 2).'/vendor/autoload.php');
         $graphBootstrap = addslashes($this->graph->bootstrapPath());
 
         return <<<PHP

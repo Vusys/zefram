@@ -24,7 +24,7 @@ final class FileHasher
 
     private function compute(string $path): ?string
     {
-        if (!is_file($path)) {
+        if (! is_file($path)) {
             return null;
         }
 

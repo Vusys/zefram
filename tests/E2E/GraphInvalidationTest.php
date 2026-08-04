@@ -26,13 +26,13 @@ final class GraphInvalidationTest extends TestCase
 {
     private const EXPENSIVE_MICROSECONDS = 300_000;
 
-    private ?GraphGenerator $graph = null;
+    private GraphGenerator $graph;
 
-    private ?GeneratedProjectRunner $runner = null;
+    private GeneratedProjectRunner $runner;
 
     protected function setUp(): void
     {
-        if (!GeneratedProjectRunner::pcovAvailable()) {
+        if (! GeneratedProjectRunner::pcovAvailable()) {
             $this->markTestSkipped('ext-pcov is not loaded; the generator E2E suite requires it, same as the package itself.');
         }
 
@@ -49,33 +49,36 @@ final class GraphInvalidationTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->runner?->destroy();
+        // setUp() may skip before $runner is assigned; tearDown() still runs.
+        if (isset($this->runner)) {
+            $this->runner->destroy();
+        }
     }
 
-    public function testFullRunExecutesEveryNode(): void
+    public function test_full_run_executes_every_node(): void
     {
         $result = $this->runner->run();
 
-        $this->assertSame(0, $result->exitCode, $result->stdout . $result->stderr);
+        $this->assertSame(0, $result->exitCode, $result->stdout.$result->stderr);
         $this->assertSame([], $result->skipped());
         $this->assertCount(5, $result->passed(), 'Leaf, B, C, D, Expensive');
         $this->assertSame(1, $this->graph->setupRunCount('Expensive'));
     }
 
-    public function testImmediateRerunSkipsEverythingAndIsMeaningfullyFaster(): void
+    public function test_immediate_rerun_skips_everything_and_is_meaningfully_faster(): void
     {
         $start = hrtime(true);
         $cold = $this->runner->run();
         $fullSeconds = (hrtime(true) - $start) / 1_000_000_000;
 
-        $this->assertSame(0, $cold->exitCode, $cold->stdout . $cold->stderr);
+        $this->assertSame(0, $cold->exitCode, $cold->stdout.$cold->stderr);
         $this->assertCount(5, $cold->passed());
 
         $start = hrtime(true);
         $rerun = $this->runner->run();
         $skippedSeconds = (hrtime(true) - $start) / 1_000_000_000;
 
-        $this->assertSame(0, $rerun->exitCode, $rerun->stdout . $rerun->stderr);
+        $this->assertSame(0, $rerun->exitCode, $rerun->stdout.$rerun->stderr);
         $this->assertSame([], $rerun->passed());
         $this->assertCount(5, $rerun->skipped());
 
@@ -89,7 +92,7 @@ final class GraphInvalidationTest extends TestCase
         );
     }
 
-    public function testMutatingTheSharedLeafRerunsExactlyItsTransitiveDependentsAndSkipsTheExpensiveNode(): void
+    public function test_mutating_the_shared_leaf_reruns_exactly_its_transitive_dependents_and_skips_the_expensive_node(): void
     {
         $this->runner->run(); // cold
         $this->runner->run(); // stable: prove full-skip before touching anything
@@ -105,7 +108,7 @@ final class GraphInvalidationTest extends TestCase
         $this->graph->mutate('Leaf');
         $result = $this->runner->run();
 
-        $this->assertSame(0, $result->exitCode, $result->stdout . $result->stderr);
+        $this->assertSame(0, $result->exitCode, $result->stdout.$result->stderr);
 
         $reranNodes = $this->idsToNodeNames($result->passed());
         sort($reranNodes);
@@ -121,7 +124,7 @@ final class GraphInvalidationTest extends TestCase
         );
     }
 
-    public function testRevertingTheMutationReinvalidatesThenStabilizesBackToFullSkip(): void
+    public function test_reverting_the_mutation_reinvalidates_then_stabilizes_back_to_full_skip(): void
     {
         $this->runner->run(); // cold
 
@@ -130,29 +133,28 @@ final class GraphInvalidationTest extends TestCase
 
         $this->graph->mutate('Leaf');
         $mutatedRun = $this->runner->run();
-        $this->assertSame($expectedDependents, self::sorted($this->idsToNodeNames($mutatedRun->passed())));
+        $this->assertSame($expectedDependents, $this->sorted($this->idsToNodeNames($mutatedRun->passed())));
 
         $this->graph->revert('Leaf');
         $revertRun = $this->runner->run();
 
-        $this->assertSame(0, $revertRun->exitCode, $revertRun->stdout . $revertRun->stderr);
+        $this->assertSame(0, $revertRun->exitCode, $revertRun->stdout.$revertRun->stderr);
         $this->assertSame(
             $expectedDependents,
-            self::sorted($this->idsToNodeNames($revertRun->passed())),
+            $this->sorted($this->idsToNodeNames($revertRun->passed())),
             'the stored hash still reflects the mutated content, so reverting must rerun the same dependents again',
         );
 
         $stableRun = $this->runner->run();
 
-        $this->assertSame(0, $stableRun->exitCode, $stableRun->stdout . $stableRun->stderr);
+        $this->assertSame(0, $stableRun->exitCode, $stableRun->stdout.$stableRun->stderr);
         $this->assertSame([], $stableRun->passed(), 'back to the exact original content, the suite must fully stabilize back to skip');
         $this->assertCount(5, $stableRun->skipped());
         $this->assertSame(1, $this->graph->setupRunCount('Expensive'), 'Expensive never depended on Leaf and must never have rerun');
     }
 
     /**
-     * @param list<string> $ids "FQCN::method"
-     *
+     * @param  list<string>  $ids  "FQCN::method"
      * @return list<string> bare node names ("B", "Expensive", ...)
      */
     private function idsToNodeNames(array $ids): array
@@ -160,7 +162,7 @@ final class GraphInvalidationTest extends TestCase
         $names = [];
 
         foreach ($this->graph->nodeNames() as $name) {
-            if (in_array($this->graph->testFqcn($name) . '::test' . $name . 'Runs', $ids, true)) {
+            if (in_array($this->graph->testFqcn($name).'::test'.$name.'Runs', $ids, true)) {
                 $names[] = $name;
             }
         }
@@ -169,11 +171,10 @@ final class GraphInvalidationTest extends TestCase
     }
 
     /**
-     * @param list<string> $values
-     *
+     * @param  list<string>  $values
      * @return list<string>
      */
-    private static function sorted(array $values): array
+    private function sorted(array $values): array
     {
         sort($values);
 

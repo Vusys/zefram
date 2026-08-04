@@ -8,6 +8,7 @@ use Vusys\Zefram\Config;
 use Vusys\Zefram\Engine;
 use Vusys\Zefram\Fingerprint;
 use Vusys\Zefram\Hash\FileHasher;
+use Vusys\Zefram\PhpUnit\ZeframExtension;
 
 /**
  * The CLI runs standalone, outside any PHPUnit process — there's no Configuration object to
@@ -19,14 +20,14 @@ use Vusys\Zefram\Hash\FileHasher;
  */
 final class ProjectConfig
 {
-    private const EXTENSION_CLASS = 'Vusys\\Zefram\\PhpUnit\\ZeframExtension';
+    private const EXTENSION_CLASS = ZeframExtension::class;
 
     private const DEFAULT_CACHE_DIRECTORY = '.zefram';
 
     public static function configurationFile(string $projectRoot): ?string
     {
         foreach (['phpunit.xml', 'phpunit.xml.dist'] as $candidate) {
-            $path = rtrim($projectRoot, '/') . '/' . $candidate;
+            $path = rtrim($projectRoot, '/').'/'.$candidate;
 
             if (is_file($path)) {
                 return $path;
@@ -52,7 +53,7 @@ final class ProjectConfig
             return $cacheDirectory;
         }
 
-        return rtrim($projectRoot, '/') . '/' . $cacheDirectory;
+        return rtrim($projectRoot, '/').'/'.$cacheDirectory;
     }
 
     /**
@@ -89,12 +90,12 @@ final class ProjectConfig
 
         $driverName = extension_loaded('pcov') ? 'pcov' : 'null';
 
-        return Fingerprint::compute($config, $driverName, Engine::VERSION, new FileHasher());
+        return Fingerprint::compute($config, $driverName, Engine::VERSION, new FileHasher);
     }
 
     public static function currentFingerprintPath(string $projectRoot): string
     {
-        return rtrim(self::cachePath($projectRoot), '/') . '/' . self::currentFingerprint($projectRoot);
+        return rtrim(self::cachePath($projectRoot), '/').'/'.self::currentFingerprint($projectRoot);
     }
 
     private static function parameter(string $projectRoot, string $name): ?string

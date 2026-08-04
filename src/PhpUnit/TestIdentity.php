@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Vusys\Zefram\PhpUnit;
 
 use PHPUnit\Event\Code\Test;
-use PHPUnit\Event\Code\TestMethod;
 
 /**
  * Extracts (class, method, dataName) from event-side test objects, matching what the
@@ -20,11 +19,9 @@ final class TestIdentity
      */
     public static function fromTest(Test $test): ?array
     {
-        if (!$test->isTestMethod()) {
+        if (! $test->isTestMethod()) {
             return null;
         }
-
-        assert($test instanceof TestMethod);
 
         $dataName = '';
 

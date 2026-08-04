@@ -6,6 +6,7 @@ namespace Vusys\Zefram\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Vusys\Zefram\Tests\Support\GraphGenerator;
+use Vusys\Zefram\Tests\Support\Runnable;
 
 final class GraphGeneratorTest extends TestCase
 {
@@ -21,7 +22,7 @@ final class GraphGeneratorTest extends TestCase
         $this->generators = [];
     }
 
-    public function testChainTopologyWritesRealExecutableClasses(): void
+    public function test_chain_topology_writes_real_executable_classes(): void
     {
         $graph = $this->generate(['A' => [], 'B' => ['A'], 'C' => ['B']]);
 
@@ -34,13 +35,14 @@ final class GraphGeneratorTest extends TestCase
         require $graph->bootstrapPath();
 
         $c = $graph->classFqcn('C');
-        $instance = new $c();
+        $instance = new $c;
+        assert($instance instanceof Runnable);
         $instance->run(); // exercises the whole A<-B<-C chain; must not throw
 
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1);
     }
 
-    public function testDiamondTopologyDependentsAreComputable(): void
+    public function test_diamond_topology_dependents_are_computable(): void
     {
         $graph = $this->generate([
             'A' => [],
@@ -55,12 +57,14 @@ final class GraphGeneratorTest extends TestCase
         require $graph->bootstrapPath();
 
         $d = $graph->classFqcn('D');
-        (new $d())->run();
+        $instance = new $d;
+        assert($instance instanceof Runnable);
+        $instance->run();
 
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1);
     }
 
-    public function testSharedLeafFanOutDependents(): void
+    public function test_shared_leaf_fan_out_dependents(): void
     {
         $graph = $this->generate([
             'Leaf' => [],
@@ -73,16 +77,16 @@ final class GraphGeneratorTest extends TestCase
         $this->assertSame([], $graph->directDependentsOf('X'));
     }
 
-    public function testUnknownDependencyIsRejected(): void
+    public function test_unknown_dependency_is_rejected(): void
     {
-        $graph = new GraphGenerator();
+        $graph = new GraphGenerator;
         $this->generators[] = $graph;
 
         $this->expectException(\RuntimeException::class);
         $graph->addNode('B', ['A']);
     }
 
-    public function testExpensiveNodeDoesRealMeasurableWorkAndWritesSetupLog(): void
+    public function test_expensive_node_does_real_measurable_work_and_writes_setup_log(): void
     {
         $graph = GraphGenerator::fromEdges(['Leaf' => []]);
         $this->generators[] = $graph;
@@ -94,34 +98,39 @@ final class GraphGeneratorTest extends TestCase
         $this->assertSame(0, $graph->setupRunCount('Expensive'));
 
         $class = $graph->classFqcn('Expensive');
+        $instance = new $class;
+        assert($instance instanceof Runnable);
+
         $start = hrtime(true);
-        (new $class())->run();
+        $instance->run();
         $elapsed = (hrtime(true) - $start) / 1_000_000_000;
 
         $this->assertGreaterThanOrEqual(0.045, $elapsed, 'expensive setup must do real, measurable work, not a faked timing number');
         $this->assertSame(1, $graph->setupRunCount('Expensive'));
 
-        (new $class())->run();
+        $again = new $class;
+        assert($again instanceof Runnable);
+        $again->run();
         $this->assertSame(2, $graph->setupRunCount('Expensive'), 'the log accumulates one line per real execution');
     }
 
-    public function testMutateChangesSourceFileAndRevertRestoresIt(): void
+    public function test_mutate_changes_source_file_and_revert_restores_it(): void
     {
         $graph = $this->generate(['A' => []]);
 
-        $before = file_get_contents($graph->sourcePath('A'));
+        $before = (string) file_get_contents($graph->sourcePath('A'));
 
         $graph->mutate('A');
-        $mutated = file_get_contents($graph->sourcePath('A'));
+        $mutated = (string) file_get_contents($graph->sourcePath('A'));
         $this->assertNotSame($before, $mutated);
         $this->assertStringContainsString('$mutation = true;', $mutated);
 
         $graph->revert('A');
-        $reverted = file_get_contents($graph->sourcePath('A'));
+        $reverted = (string) file_get_contents($graph->sourcePath('A'));
         $this->assertSame($before, $reverted);
     }
 
-    public function testTwoGeneratorsInTheSameProcessDoNotCollide(): void
+    public function test_two_generators_in_the_same_process_do_not_collide(): void
     {
         $first = $this->generate(['A' => []]);
         $second = $this->generate(['A' => []]);
@@ -134,14 +143,14 @@ final class GraphGeneratorTest extends TestCase
 
         $a1 = $first->classFqcn('A');
         $a2 = $second->classFqcn('A');
-        new $a1();
-        new $a2();
+        new $a1;
+        new $a2;
 
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1);
     }
 
     /**
-     * @param array<string, list<string>> $edges
+     * @param  array<string, list<string>>  $edges
      */
     private function generate(array $edges): GraphGenerator
     {

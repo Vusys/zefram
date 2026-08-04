@@ -14,7 +14,7 @@ final class ApplicationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->project = new TempProject();
+        $this->project = new TempProject;
     }
 
     protected function tearDown(): void
@@ -24,7 +24,7 @@ final class ApplicationTest extends TestCase
         }
     }
 
-    public function testDispatchesToTheClearCommand(): void
+    public function test_dispatches_to_the_clear_command(): void
     {
         $this->project->write('.zefram/fp/tests/fake.json', '{}');
 
@@ -38,7 +38,7 @@ final class ApplicationTest extends TestCase
         $this->assertDirectoryDoesNotExist($this->project->path('.zefram'));
     }
 
-    public function testPrintsUsageAndFailsWithNoCommand(): void
+    public function test_prints_usage_and_fails_with_no_command(): void
     {
         $app = new Application($this->project->root);
 
@@ -47,7 +47,7 @@ final class ApplicationTest extends TestCase
         $this->assertSame(1, $exitCode);
     }
 
-    public function testPrintsUsageAndFailsOnAnUnknownCommand(): void
+    public function test_prints_usage_and_fails_on_an_unknown_command(): void
     {
         $app = new Application($this->project->root);
 
@@ -56,10 +56,10 @@ final class ApplicationTest extends TestCase
         $this->assertSame(1, $exitCode);
     }
 
-    public function testDefaultsProjectRootToTheCurrentWorkingDirectoryWhenUnspecified(): void
+    public function test_defaults_project_root_to_the_current_working_directory_when_unspecified(): void
     {
         // must not throw when constructed with no argument
-        $app = new Application();
+        $app = new Application;
 
         $this->assertSame(1, $app->run(['bin/zefram', 'nonexistent']));
     }

@@ -21,7 +21,7 @@ final class ExecutionFinishedSubscriberTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->project = new TempProject();
+        $this->project = new TempProject;
     }
 
     protected function tearDown(): void
@@ -31,7 +31,7 @@ final class ExecutionFinishedSubscriberTest extends TestCase
         }
     }
 
-    public function testPrintsTheSummaryLineOutsideParatest(): void
+    public function test_prints_the_summary_line_outside_paratest(): void
     {
         $engine = $this->engine(paratestWorker: false);
         $engine->shouldSkip('App\\Tests\\AlphaTest', 'testOne', '');
@@ -41,7 +41,7 @@ final class ExecutionFinishedSubscriberTest extends TestCase
         $this->assertStringContainsString('Zefram: skipped', $output);
     }
 
-    public function testSuppressesTheSummaryLineUnderParatest(): void
+    public function test_suppresses_the_summary_line_under_paratest(): void
     {
         // #12: every paratest worker independently fires ExecutionFinished — with concurrent
         // workers, each printing its own summary line mangles the terminal output.
@@ -53,7 +53,7 @@ final class ExecutionFinishedSubscriberTest extends TestCase
         $this->assertSame('', $output, 'a paratest worker must never print its own summary line');
     }
 
-    public function testStillFlushesTheStoreUnderParatestDespiteSuppressingOutput(): void
+    public function test_still_flushes_the_store_under_paratest_despite_suppressing_output(): void
     {
         // suppressing the print must not skip the underlying finish() work (flush etc.)
         $filePath = $this->project->write('src/A.php', '<?php class A {}');
@@ -91,7 +91,7 @@ final class ExecutionFinishedSubscriberTest extends TestCase
             paratestWorker: $paratestWorker,
         );
 
-        return new Engine($config, $driver ?? new FakeDriver(), new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp');
+        return new Engine($config, $driver ?? new FakeDriver, new Store($config->cachePath().'/fp'), new FileHasher, 'fp');
     }
 
     /**

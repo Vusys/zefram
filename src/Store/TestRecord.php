@@ -13,17 +13,16 @@ final readonly class TestRecord
      * unsafe: a --filter run rerunning one test against a changed file would silently
      * revalidate sibling records that never ran against the new code.
      *
-     * @param array<string, string> $files relative path => xxh128 of content when this test last passed
+     * @param  array<string, string>  $files  relative path => xxh128 of content when this test last passed
      */
     public function __construct(
         public array $files,
         public float $duration,
         public string $result,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param array{files: array<string, string>, duration: float, result: string} $data
+     * @param  array{files: array<string, string>, duration: float, result: string}  $data
      */
     public static function fromArray(array $data): self
     {

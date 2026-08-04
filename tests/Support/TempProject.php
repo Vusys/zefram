@@ -7,27 +7,28 @@ namespace Vusys\Zefram\Tests\Support;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use SplFileInfo;
 
 /**
  * A throwaway project root on disk: source files to hash, a cache directory to fill.
  */
-final class TempProject
+final readonly class TempProject
 {
-    public readonly string $root;
+    public string $root;
 
     public function __construct()
     {
-        $this->root = sys_get_temp_dir() . '/zefram-test-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir().'/zefram-test-'.bin2hex(random_bytes(8));
 
         mkdir($this->root, 0775, true);
     }
 
     public function write(string $relative, string $content): string
     {
-        $path = $this->root . '/' . $relative;
+        $path = $this->root.'/'.$relative;
         $directory = dirname($path);
 
-        if (!is_dir($directory)) {
+        if (! is_dir($directory)) {
             mkdir($directory, 0775, true);
         }
 
@@ -38,12 +39,12 @@ final class TempProject
 
     public function path(string $relative): string
     {
-        return $this->root . '/' . $relative;
+        return $this->root.'/'.$relative;
     }
 
     public function destroy(): void
     {
-        if (!is_dir($this->root)) {
+        if (! is_dir($this->root)) {
             return;
         }
 
@@ -53,6 +54,7 @@ final class TempProject
         );
 
         foreach ($iterator as $item) {
+            assert($item instanceof SplFileInfo);
             $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
         }
 

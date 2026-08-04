@@ -11,9 +11,7 @@ use Vusys\Zefram\PhpUnit\TestIdentity;
 
 final readonly class TestMarkedIncompleteSubscriber implements MarkedIncompleteSubscriber
 {
-    public function __construct(private Engine $engine)
-    {
-    }
+    public function __construct(private Engine $engine) {}
 
     public function notify(MarkedIncomplete $event): void
     {

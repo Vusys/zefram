@@ -16,7 +16,7 @@ final class FingerprintTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->project = new TempProject();
+        $this->project = new TempProject;
         $this->project->write('composer.lock', '{"packages": []}');
     }
 
@@ -29,12 +29,12 @@ final class FingerprintTest extends TestCase
         }
     }
 
-    public function testStableAcrossRuns(): void
+    public function test_stable_across_runs(): void
     {
         $this->assertSame($this->compute(), $this->compute());
     }
 
-    public function testChangesWhenComposerLockChanges(): void
+    public function test_changes_when_composer_lock_changes(): void
     {
         $before = $this->compute();
 
@@ -43,7 +43,7 @@ final class FingerprintTest extends TestCase
         $this->assertNotSame($before, $this->compute());
     }
 
-    public function testChangesWhenWatchedFileChanges(): void
+    public function test_changes_when_watched_file_changes(): void
     {
         $this->project->write('.env.testing', 'APP_ENV=testing');
 
@@ -54,7 +54,7 @@ final class FingerprintTest extends TestCase
         $this->assertNotSame($before, $this->compute(watched: ['.env.testing']));
     }
 
-    public function testWatchedGlobsMatchMultipleFiles(): void
+    public function test_watched_globs_match_multiple_files(): void
     {
         $this->project->write('config/a.php', '<?php return [];');
         $this->project->write('config/b.php', '<?php return [];');
@@ -66,7 +66,7 @@ final class FingerprintTest extends TestCase
         $this->assertNotSame($before, $this->compute(watched: ['config/*.php']));
     }
 
-    public function testRecursiveGlobsMatchNestedFiles(): void
+    public function test_recursive_globs_match_nested_files(): void
     {
         $this->project->write('resources/views/welcome.blade.php', '<p>hi</p>');
         $this->project->write('resources/views/crew/index.blade.php', '<p>crew</p>');
@@ -78,7 +78,7 @@ final class FingerprintTest extends TestCase
         $this->assertNotSame($before, $this->compute(watched: ['resources/views/**/*.blade.php']));
     }
 
-    public function testRecursiveGlobIgnoresNonMatchingNestedFiles(): void
+    public function test_recursive_glob_ignores_non_matching_nested_files(): void
     {
         $this->project->write('config/app.php', '<?php return [];');
         $this->project->write('config/nested/deep.php', '<?php return [];');
@@ -94,12 +94,12 @@ final class FingerprintTest extends TestCase
         $this->assertNotSame($before, $this->compute(watched: ['config/**']));
     }
 
-    public function testChangesWithDriverName(): void
+    public function test_changes_with_driver_name(): void
     {
         $this->assertNotSame($this->compute(driver: 'pcov'), $this->compute(driver: 'other'));
     }
 
-    public function testChangesWhenConfigurationFileContentChanges(): void
+    public function test_changes_when_configuration_file_content_changes(): void
     {
         $path = $this->project->write('phpunit.xml', '<?xml version="1.0"?><phpunit></phpunit>');
 
@@ -113,13 +113,13 @@ final class FingerprintTest extends TestCase
         $this->assertNotSame($before, $this->compute(configurationFile: $path));
     }
 
-    public function testUnaffectedByConfigurationFileWhenNoneIsConfigured(): void
+    public function test_unaffected_by_configuration_file_when_none_is_configured(): void
     {
-        $this->assertSame($this->compute(configurationFile: null), $this->compute(configurationFile: null));
+        $this->assertSame($this->compute(), $this->compute());
     }
 
     /**
-     * @param list<string> $watched
+     * @param  list<string>  $watched
      */
     private function compute(array $watched = [], string $driver = 'pcov', ?string $configurationFile = null): string
     {
@@ -131,6 +131,6 @@ final class FingerprintTest extends TestCase
         );
 
         // a fresh hasher each time: the memo must not mask disk changes between computations
-        return Fingerprint::compute($config, $driver, '0.1.0', new FileHasher());
+        return Fingerprint::compute($config, $driver, '0.1.0', new FileHasher);
     }
 }
