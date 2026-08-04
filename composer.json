@@ -21,6 +21,9 @@
             "Vusys\\Zefram\\Tests\\": "tests/"
         }
     },
+    "bin": [
+        "bin/zefram"
+    ],
     "config": {
         "sort-packages": true
     },

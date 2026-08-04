@@ -1,0 +1,31 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+// Two layouts to support: run in-repo (bin/../vendor/autoload.php) and installed as a
+// dependency where Composer proxies this script from vendor/bin/, three levels below the
+// consuming project's own vendor/autoload.php (vendor/vusys/zefram/bin/zefram).
+$autoloadCandidates = [
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+];
+
+$autoloaded = false;
+
+foreach ($autoloadCandidates as $candidate) {
+    if (is_file($candidate)) {
+        require $candidate;
+        $autoloaded = true;
+
+        break;
+    }
+}
+
+if (!$autoloaded) {
+    fwrite(STDERR, "zefram: could not locate the Composer autoloader\n");
+
+    exit(1);
+}
+
+exit((new Vusys\Zefram\Console\Application())->run($argv));

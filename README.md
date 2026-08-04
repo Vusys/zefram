@@ -73,6 +73,21 @@ Coverage-as-critical-path is a heuristic. It cannot see env vars, time, randomne
 
 Zefram also disables itself automatically when PHPUnit is collecting coverage (`--coverage-*`), since both would contend for pcov and skipped tests would falsify the report.
 
+## CLI
+
+```bash
+vendor/bin/zefram clear
+```
+
+Deletes the entire cache directory (reads `cacheDirectory` from your
+`phpunit.xml`'s `ZeframExtension` parameter the same way the extension
+itself does, defaulting to `.zefram`). Always clears everything — there's no
+fingerprint-scoping argument, since stale fingerprint directories are
+already pruned automatically during normal runs (any watched-path edit spins
+up a fresh one, and the previous fingerprint's directory gets deleted the
+next time you run your suite normally). A no-op, not an error, if the cache
+directory doesn't exist yet.
+
 ## Development
 
 ```bash
