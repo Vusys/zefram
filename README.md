@@ -157,6 +157,46 @@ How it works, above), the actual failure mode is a lost/overwritten
 than being incorrectly cached. Still, avoid `--functional` with Zefram
 enabled.
 
+## CI
+
+Without persisting `.zefram/` across runs, every CI run starts cold and the
+package never gets to skip anything there — which is one of the highest-value
+places to see savings, since CI usually re-runs the same passing tests over
+and over on unchanged code. `actions/cache` on GitHub Actions:
+
+```yaml
+- name: Cache Zefram
+  uses: actions/cache@v4
+  with:
+    path: .zefram
+    key: zefram-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.lock', 'phpunit.xml') }}
+    restore-keys: |
+      zefram-${{ runner.os }}-php${{ matrix.php }}-
+
+- name: Install dependencies
+  run: composer install --no-interaction --prefer-dist
+
+- name: Test
+  run: composer test
+```
+
+Place the cache step before `composer install`, keyed on the PHP version
+you're building (`matrix.php`, or hardcode it outside a matrix) plus a hash
+of `composer.lock` and `phpunit.xml` — the same two file-content inputs that
+feed the global fingerprint (see How it works, above; PHP version and
+package version round out the fingerprint but don't need to be hashed here
+since they're already baked into the key or don't change within a job). The
+`restore-keys` fallback means a partial match (e.g. after a `composer.lock`
+bump changes the exact key) still restores whatever's on the cache instead
+of starting fully cold — the fingerprint model already isolates the stale
+entries the restored cache brings along into their own directory, so they're
+harmless, just unused until pruned automatically on the next full run (see
+the CLI section's `clear` command note above for how that pruning works).
+
+Under paratest (see Paratest, above), the cache step doesn't need to change —
+`.zefram/` accumulates the same way regardless of how many workers wrote to
+it, since each worker's shards are self-contained.
+
 ## Development
 
 ```bash
