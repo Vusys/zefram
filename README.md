@@ -77,5 +77,13 @@ Zefram also disables itself automatically when PHPUnit is collecting coverage (`
 
 ```bash
 composer install
-composer test
+composer test       # fast unit suite — run this on every save
+composer test:e2e   # slower end-to-end suite: spawns real child PHPUnit processes
+                     # (dogfooding the package's own source, and a generated
+                     # dependency graph) — run before pushing, or in a dedicated CI job
 ```
+
+`composer test` runs `tests/Unit/`; `composer test:e2e` runs `tests/E2E/` (via a
+separate `<testsuite>` in `phpunit.xml`, selected with `--testsuite e2e`). The
+e2e suite needs [pcov](https://github.com/krakjoe/pcov) and skips itself
+gracefully without it, same as the package.
