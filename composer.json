@@ -1,5 +1,5 @@
 {
-    "name": "vusys/zefram-tests",
+    "name": "vusys/zefram",
     "description": "Skip PHPUnit tests whose executed code hasn't changed since they last passed. Faster than light.",
     "license": "MIT",
     "type": "library",
