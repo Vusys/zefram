@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vusys\Zefram;
 
+use Closure;
 use ReflectionClass;
 use ReflectionMethod;
 use Vusys\Zefram\Attribute\NeverSkip;
@@ -46,13 +47,30 @@ final class Engine
 
     private float $timeSaved = 0.0;
 
+    /**
+     * Sum of stopCapture()'s real measured duration for every test that actually ran this
+     * pass (any outcome — pass, fail, error, risky, incomplete, foreign-skip-after-running),
+     * as opposed to $timeSaved, which is stored duration for tests we skipped. Together
+     * these are the numerator of the "warp factor" (#10): what this pass would have cost at
+     * sublight, versus $elapsed, what it actually cost.
+     */
+    private float $ranDuration = 0.0;
+
+    private readonly Closure $clock;
+
+    private readonly int $startedAt;
+
     public function __construct(
         private readonly Config $config,
         private readonly CoverageDriver $driver,
         private readonly Store $store,
         private readonly FileHasher $hasher,
         private readonly string $fingerprint = '',
+        ?Closure $clock = null,
     ) {
+        // injectable for deterministic warp-factor tests; real usage always gets hrtime()
+        $this->clock = $clock ?? static fn (): int => hrtime(true);
+        $this->startedAt = ($this->clock)();
     }
 
     public static function create(Config $config, ?CoverageDriver $driver = null): self
@@ -123,6 +141,7 @@ final class Engine
             'files' => $this->hashProjectFiles($files),
             'duration' => $duration,
         ];
+        $this->ranDuration += $duration;
 
         $this->current = null;
     }
@@ -196,11 +215,29 @@ final class Engine
         }
 
         return sprintf(
-            'Zefram: skipped %d of %d tests (~%s at sublight)',
+            'Zefram: skipped %d of %d tests (~%s at sublight, warp factor %.1f)',
             $this->skipped,
             $this->testsSeen,
             self::formatSeconds($this->timeSaved),
+            $this->warpFactor(),
         );
+    }
+
+    /**
+     * (sum of stored duration for every skipped test, i.e. what it cost the last time it
+     * actually ran, plus the real measured duration of every test that did run this pass)
+     * divided by (the actual measured wall time of this pass). ~1.0 with nothing skipped;
+     * heavy skipping pushes it up. A real computed number, not illustrative text.
+     */
+    public function warpFactor(): float
+    {
+        $elapsed = (($this->clock)() - $this->startedAt) / 1_000_000_000;
+
+        if ($elapsed <= 0.0) {
+            return 1.0;
+        }
+
+        return ($this->ranDuration + $this->timeSaved) / $elapsed;
     }
 
     /**

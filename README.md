@@ -12,6 +12,20 @@ Tests running faster than light. Zefram records the set of files each PHPUnit te
 
 Failures are never cached: only a passing run can create a skip record, and any non-pass drops it.
 
+At the end of a run, the extension prints a summary line:
+
+```
+Zefram: skipped 12 of 20 tests (~4.2s at sublight, warp factor 3.1)
+```
+
+The **warp factor** is a real computed ratio, not flavor text: (the stored duration of
+every skipped test, from the last time it actually ran, plus the real measured duration of
+every test that did run this pass) ÷ (the actual wall-clock time this pass took). A run with
+nothing skipped sits around 1.0; heavy skipping pushes it up. It can also sit *below* 1.0 on
+a suite whose tests are already near-instant — skipping a handful of microsecond tests can't
+outrun fixed PHPUnit process/bootstrap overhead, and the metric says so honestly rather than
+flattering itself.
+
 ## Installation
 
 ```bash

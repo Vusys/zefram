@@ -10,6 +10,7 @@ use Vusys\Zefram\Config;
 use Vusys\Zefram\Engine;
 use Vusys\Zefram\Hash\FileHasher;
 use Vusys\Zefram\Store\Store;
+use Vusys\Zefram\Store\TestRecord;
 use Vusys\Zefram\Tests\Support\FakeDriver;
 use Vusys\Zefram\Tests\Support\TempProject;
 
@@ -200,6 +201,50 @@ final class EngineTest extends TestCase
 
         $this->assertNotNull($summary);
         $this->assertStringContainsString('skipped 1 of 1', $summary);
+        $this->assertMatchesRegularExpression('/warp factor \d+\.\d/', $summary);
+    }
+
+    public function testWarpFactorComputesRatioOfEstimatedFullRunToActualElapsed(): void
+    {
+        $config = new Config(enabled: true, projectRoot: $this->project->root);
+        $hasher = new FileHasher();
+
+        // seed a known "last recorded duration" for a test that will be skipped this pass
+        $store = new Store($config->cachePath() . '/fp');
+        $store->put(self::TEST_CLASS, 'testEngage', new TestRecord(
+            files: [
+                'src/WarpCore.php' => $hasher->hash($this->project->path('src/WarpCore.php')),
+                'tests/WarpCoreTest.php' => $hasher->hash($this->project->path('tests/WarpCoreTest.php')),
+            ],
+            duration: 4.0,
+            result: TestRecord::RESULT_PASSED,
+        ));
+        $store->flush();
+
+        // deterministic clock: construction sees t=0, warpFactor() sees t=10s later
+        $times = [0, 10_000_000_000];
+        $i = 0;
+        $clock = static function () use (&$times, &$i): int {
+            return $times[$i++] ?? end($times);
+        };
+
+        $engine = new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp', $clock);
+
+        $this->assertTrue($engine->shouldSkip(self::TEST_CLASS, 'testEngage', ''), 'sanity: the seeded record must actually be skippable');
+
+        // (4.0s stored duration for the one skipped test + 0s for anything that actually
+        // ran) / 10s elapsed = 0.4
+        $this->assertEqualsWithDelta(0.4, $engine->warpFactor(), 0.0001);
+    }
+
+    public function testWarpFactorIsOneWhenElapsedTimeIsZero(): void
+    {
+        $clock = static fn (): int => 5_000_000_000; // constant: construction and warpFactor() see the same instant
+        $config = new Config(enabled: true, projectRoot: $this->project->root);
+
+        $engine = new Engine($config, $this->driver, new Store($config->cachePath() . '/fp'), new FileHasher(), 'fp', $clock);
+
+        $this->assertSame(1.0, $engine->warpFactor());
     }
 
     public function testIsFullRunReflectsConfig(): void
