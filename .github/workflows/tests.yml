@@ -26,10 +26,12 @@ jobs:
           # PHPUnit 12 requires PHP >= 8.3.
           - php: '8.2'
             phpunit: '12.0'
-          # brianium/paratest ^7.20 requires phpunit/phpunit ^12.5.14 || ^13.0.5
-          # (confirmed empirically — no ^7.20 release supports the 11.x line),
-          # so it cannot be installed alongside PHPUnit ^11.5 at all, whether or
-          # not paratest actually runs. See the note on #17.
+          # brianium/paratest ^7.20 requires PHP >= 8.3 *and* phpunit/phpunit
+          # ^12.5.14 || ^13.0.5 (confirmed empirically — no ^7.20 release
+          # supports PHP 8.2 or the PHPUnit 11.x line). Both constraints are
+          # already implied by the PHP-8.2/PHPUnit-12.0 exclusion above once
+          # this exclusion is added, but spelling it out here documents *why*
+          # paratest is never installed for an 11.5 cell. See the note on #17.
           - phpunit: '11.5'
             paratest: true
     steps:
@@ -44,14 +46,12 @@ jobs:
       - name: Require PHPUnit ^${{ matrix.phpunit }}
         run: composer require "phpunit/phpunit:^${{ matrix.phpunit }}" --no-update --no-interaction
 
-      # brianium/paratest ^7.20 requires phpunit/phpunit ^12.5.14 || ^13.0.5,
-      # so it can't even be *installed* alongside PHPUnit ^11.5 — not just
-      # unused, a hard resolution conflict. Drop it from the dev install for
-      # 11.5 cells; the paratest:true side of the matrix is already excluded
-      # for phpunit 11.5 above, so nothing here needs paratest present.
-      - name: Drop paratest (incompatible with PHPUnit 11.5)
-        if: matrix.phpunit == '11.5'
-        run: composer remove --dev brianium/paratest --no-update --no-interaction
+      # brianium/paratest isn't in the base require-dev at all (it can't
+      # install on PHP 8.2, this package's own floor — see #42) — pull it in
+      # just-in-time only for the cells that actually exercise it.
+      - name: Require paratest
+        if: matrix.paratest
+        run: composer require --dev "brianium/paratest:^7.20" --no-update --no-interaction
 
       - name: Install dependencies
         run: composer update --prefer-dist --no-interaction --no-progress
@@ -74,3 +74,43 @@ jobs:
 
       - name: Run e2e suite
         run: composer test:e2e
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    name: Static analysis & code style
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer:v2
+
+      - run: composer update --prefer-dist --no-interaction --no-progress
+      - run: vendor/bin/phpstan analyse --no-progress --error-format=github
+      - run: vendor/bin/rector process --dry-run --no-progress-bar
+      - run: vendor/bin/pint --test
+
+  actionlint:
+    runs-on: ubuntu-latest
+    name: Lint workflows
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+
+  gate:
+    needs: [test, static-analysis, actionlint]
+    runs-on: ubuntu-latest
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    name: CI gate
+    steps:
+      - name: Require every upstream job to have passed or been skipped
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          for r in ${results}; do
+            if [ "${r}" = "failure" ] || [ "${r}" = "cancelled" ]; then
+              echo "::error::a required job did not pass (result=${r})"
+              exit 1
+            fi
+          done
