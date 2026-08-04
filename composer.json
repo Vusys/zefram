@@ -4,6 +4,17 @@
     "license": "MIT",
     "type": "library",
     "keywords": ["phpunit", "testing", "test-skipping", "coverage", "ci"],
+    "authors": [
+        {
+            "name": "Bryan",
+            "email": "bryan@vuii.co.uk",
+            "role": "Maintainer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/Vusys/zefram/issues",
+        "source": "https://github.com/Vusys/zefram"
+    },
     "require": {
         "php": "^8.2",
         "phpunit/phpunit": "^11.5 || ^12.0"
@@ -24,8 +35,13 @@
     "bin": [
         "bin/zefram"
     ],
+    "minimum-stability": "stable",
+    "prefer-stable": true,
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "infection/extension-installer": true
+        }
     },
     "scripts": {
         "analyse": "phpstan analyse",
