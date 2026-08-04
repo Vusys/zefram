@@ -26,7 +26,7 @@ use Vusys\Zefram\Zefram;
  *         <bootstrap class="Vusys\Zefram\PhpUnit\ZeframExtension">
  *             <parameter name="enabled" value="true"/>
  *             <parameter name="cacheDirectory" value=".zefram"/>
- *             <parameter name="watchedPaths" value=".env.testing,config/**,database/migrations/**,resources/views/**/*.blade.php"/>
+ *             <parameter name="watchedPaths" value=".env.testing,config/**,database/migrations/**,resources/views/**\/*.blade.php"/>
  *             <parameter name="neverSkip" value="App\Tests\Flaky\*"/>
  *         </bootstrap>
  *     </extensions>

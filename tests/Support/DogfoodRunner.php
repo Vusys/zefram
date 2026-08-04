@@ -1,0 +1,294 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Vusys\Zefram\Tests\Support;
+
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
+
+/**
+ * Runs a *copy* of this package's own src/ and a chosen subset of tests/Unit/ through a
+ * child PHPUnit process with ZeframExtension registered against itself — "dogfooding".
+ * A copy rather than the real tree: the outer test process asserting on results must not
+ * share coverage/state with the child's capture window, and the E2E tests need to freely
+ * mutate copied source between runs without touching the real src/.
+ *
+ * The child process reuses the *outer* PHPUnit framework (no vendor/ copy) but resolves
+ * every Vusys\Zefram(\Tests)\ class from the copy: its generated bootstrap prepends an
+ * autoloader for that namespace ahead of Composer's, so the framework classes come from
+ * the outer vendor/autoload.php while the package-under-test classes come from the copy.
+ */
+final class DogfoodRunner
+{
+    public readonly string $root;
+
+    /** @var list<string> */
+    private const DEFAULT_TEST_FILES = ['FileHasherTest.php', 'EngineTest.php', 'StoreTest.php'];
+
+    /** @var list<string> */
+    private const SUPPORT_FILES = ['FakeDriver.php', 'TempProject.php'];
+
+    /**
+     * @param list<string> $testFiles filenames under tests/Unit to copy in and run
+     */
+    public function __construct(private readonly array $testFiles = self::DEFAULT_TEST_FILES)
+    {
+        $this->root = sys_get_temp_dir() . '/zefram-dogfood-' . bin2hex(random_bytes(8));
+
+        $this->setUpCopy();
+    }
+
+    public static function pcovAvailable(): bool
+    {
+        return ChildPhpUnitProcess::pcovAvailable();
+    }
+
+    public function run(): ChildRunResult
+    {
+        return (new ChildPhpUnitProcess())->run($this->root, $this->root . '/phpunit.xml');
+    }
+
+    /**
+     * Overwrite a copied file's contents (relative to the copy root, e.g. "src/Hash/FileHasher.php").
+     */
+    public function write(string $relativePath, string $content): void
+    {
+        file_put_contents($this->root . '/' . $relativePath, $content);
+    }
+
+    public function read(string $relativePath): string
+    {
+        return (string) file_get_contents($this->root . '/' . $relativePath);
+    }
+
+    /**
+     * @param callable(string): string $transform
+     */
+    public function mutate(string $relativePath, callable $transform): void
+    {
+        $this->write($relativePath, $transform($this->read($relativePath)));
+    }
+
+    /**
+     * Every stored test record across every shard the child run produced, keyed by
+     * "FullyQualified\ClassName::method" (matching ChildRunResult/TestOutcome's id format —
+     * none of the dogfooded classes use PHPUnit data providers, so the raw stored key is
+     * always a bare method name).
+     *
+     * @return array<string, array{files: array<string, string>, duration: float, result: string}>
+     */
+    public function shardRecords(): array
+    {
+        $records = [];
+
+        foreach (glob($this->root . '/.zefram/*/tests/*.json') ?: [] as $shardFile) {
+            $decoded = json_decode((string) file_get_contents($shardFile), true);
+
+            if (!is_array($decoded) || !isset($decoded['class'], $decoded['tests']) || !is_array($decoded['tests'])) {
+                continue;
+            }
+
+            foreach ($decoded['tests'] as $key => $record) {
+                $records[$decoded['class'] . '::' . $key] = $record;
+            }
+        }
+
+        return $records;
+    }
+
+    /**
+     * Ground truth read straight from the last run's own coverage output — not a guess:
+     * every test id whose recorded file set includes $relativePath.
+     *
+     * @return list<string>
+     */
+    public function testsThatExecuted(string $relativePath): array
+    {
+        $ids = [];
+
+        foreach ($this->shardRecords() as $id => $record) {
+            if (array_key_exists($relativePath, $record['files'] ?? [])) {
+                $ids[] = $id;
+            }
+        }
+
+        sort($ids);
+
+        return $ids;
+    }
+
+    public function destroy(): void
+    {
+        self::removeDirectory($this->root);
+    }
+
+    private function setUpCopy(): void
+    {
+        mkdir($this->root . '/src', 0775, true);
+        mkdir($this->root . '/tests/Unit', 0775, true);
+        mkdir($this->root . '/tests/Support', 0775, true);
+
+        $outerRoot = dirname(__DIR__, 2);
+
+        self::copyDirectory($outerRoot . '/src', $this->root . '/src');
+
+        foreach ($this->testFiles as $file) {
+            $content = (string) file_get_contents($outerRoot . '/tests/Unit/' . $file);
+            file_put_contents($this->root . '/tests/Unit/' . $file, self::zeframify($content));
+        }
+
+        foreach (self::SUPPORT_FILES as $file) {
+            copy($outerRoot . '/tests/Support/' . $file, $this->root . '/tests/Support/' . $file);
+        }
+
+        file_put_contents($this->root . '/bootstrap.php', $this->renderBootstrap($outerRoot));
+        file_put_contents($this->root . '/phpunit.xml', $this->renderPhpUnitConfig());
+    }
+
+    private function renderBootstrap(string $outerRoot): string
+    {
+        $outerAutoload = addslashes($outerRoot . '/vendor/autoload.php');
+        $copyRoot = addslashes($this->root);
+
+        return <<<PHP
+<?php
+
+declare(strict_types=1);
+
+// Generated by Vusys\Zefram\Tests\Support\DogfoodRunner. Reuses the outer PHPUnit framework
+// (no vendor/ copy) but must resolve Vusys\Zefram(\Tests)\ classes from THIS copy, not the
+// real src/ that Composer's autoloader would otherwise hand back — so this autoloader is
+// prepended ahead of Composer's, intercepting the package's own namespace before it does.
+require '{$outerAutoload}';
+
+spl_autoload_register(static function (string \$class): void {
+    \$copyRoot = '{$copyRoot}';
+
+    if (str_starts_with(\$class, 'Vusys\\\\Zefram\\\\Tests\\\\')) {
+        \$relative = substr(\$class, strlen('Vusys\\\\Zefram\\\\Tests\\\\'));
+        \$path = \$copyRoot . '/tests/' . str_replace('\\\\', '/', \$relative) . '.php';
+    } elseif (str_starts_with(\$class, 'Vusys\\\\Zefram\\\\')) {
+        \$relative = substr(\$class, strlen('Vusys\\\\Zefram\\\\'));
+        \$path = \$copyRoot . '/src/' . str_replace('\\\\', '/', \$relative) . '.php';
+    } else {
+        return;
+    }
+
+    if (is_file(\$path)) {
+        require \$path;
+    }
+}, true, true);
+
+PHP;
+    }
+
+    private function renderPhpUnitConfig(): string
+    {
+        $root = htmlspecialchars($this->root, ENT_XML1);
+
+        return <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="{$root}/bootstrap.php"
+         cacheDirectory="{$root}/.phpunit.cache"
+         failOnRisky="true"
+         failOnWarning="true">
+    <testsuites>
+        <testsuite name="dogfood">
+            <directory>{$root}/tests/Unit</directory>
+        </testsuite>
+    </testsuites>
+    <extensions>
+        <bootstrap class="Vusys\\Zefram\\PhpUnit\\ZeframExtension">
+            <parameter name="cacheDirectory" value=".zefram"/>
+        </bootstrap>
+    </extensions>
+    <source>
+        <include>
+            <directory>{$root}/src</directory>
+        </include>
+    </source>
+</phpunit>
+
+XML;
+    }
+
+    private static function copyDirectory(string $from, string $to): void
+    {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($from, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST,
+        );
+
+        foreach ($iterator as $item) {
+            assert($item instanceof SplFileInfo);
+
+            $target = $to . '/' . substr($item->getPathname(), strlen($from) + 1);
+
+            if ($item->isDir()) {
+                if (!is_dir($target)) {
+                    mkdir($target, 0775, true);
+                }
+            } else {
+                copy($item->getPathname(), $target);
+            }
+        }
+    }
+
+    /**
+     * The real tests/Unit classes don't use ZeframAware themselves — the package's own
+     * fast suite has no reason to skip itself. Dogfooding needs them wired up like a real
+     * consumer's TestCase, so this rewrites a copied test file to `use ZeframAware;` and,
+     * since every copied class here defines its own setUp() (which shadows the trait's per
+     * normal PHP method resolution — see ZeframAware's own docblock and #20), also inserts
+     * the documented `$this->zeframSetUp();` as that method's first statement.
+     */
+    private static function zeframify(string $content): string
+    {
+        $content = (string) preg_replace(
+            '/^use PHPUnit\\\\Framework\\\\TestCase;$/m',
+            "use PHPUnit\\\\Framework\\\\TestCase;\nuse Vusys\\\\Zefram\\\\ZeframAware;",
+            $content,
+            1,
+        );
+
+        $content = (string) preg_replace(
+            '/((?:final\s+)?class\s+\w+\s+extends\s+TestCase\s*\n\{\n)/',
+            '$1    use ZeframAware;' . "\n\n",
+            $content,
+            1,
+        );
+
+        $content = (string) preg_replace(
+            '/(protected function setUp\(\): void\s*\n\s*\{\n)/',
+            '$1        $this->zeframSetUp();' . "\n\n",
+            $content,
+            1,
+        );
+
+        return $content;
+    }
+
+    private static function removeDirectory(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($iterator as $item) {
+            assert($item instanceof SplFileInfo);
+            $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+        }
+
+        rmdir($dir);
+    }
+}

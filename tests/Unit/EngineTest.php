@@ -37,7 +37,11 @@ final class EngineTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->project->destroy();
+        // setUp() may throw before $project is assigned (e.g. a test skipped upstream of
+        // TempProject construction) — tearDown() still runs, so guard the typed property.
+        if (isset($this->project)) {
+            $this->project->destroy();
+        }
     }
 
     public function testFirstRunNeverSkips(): void
