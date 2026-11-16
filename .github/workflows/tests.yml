@@ -75,7 +75,16 @@ jobs:
 
       - name: Run unit suite
         if: ${{ !matrix.paratest }}
-        run: composer test
+        # Coverage on one representative cell only (#68, the family convention from #36).
+        run: composer test -- ${{ matrix.php == '8.4' && matrix.phpunit == '13.0' && '--coverage-clover=coverage.xml' || '' }}
+
+      - name: Upload coverage to Codecov
+        if: ${{ !matrix.paratest && matrix.php == '8.4' && matrix.phpunit == '13.0' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
       - name: Run e2e suite
         run: composer test:e2e
