@@ -87,7 +87,7 @@ Coverage-as-critical-path is a heuristic. It cannot see env vars, time, randomne
 
 - `#[\Vusys\Zefram\Attribute\NeverSkip]` on a test class or method.
 - `neverSkip` parameter with fnmatch patterns: `<parameter name="neverSkip" value="App\Tests\Flaky\*"/>`.
-- `watchedPaths` for file-shaped dependencies — any change to a matched file invalidates the entire cache. Patterns support `**` for recursive matching. Laravel users should always watch `config/**` (config files are visible to coverage only until `config:cache` makes them a blind spot — exactly the CI runs you want to accelerate) and Blade *sources* (the compiled artifacts are deleted by `view:clear`).
+- `watchedPaths` for file-shaped dependencies — any change to a matched file invalidates the entire cache. Patterns support `**` for recursive matching. Laravel users should always watch `config/**` (config files are visible to coverage only until `config:cache` makes them a blind spot — exactly the CI runs you want to accelerate) Blade *sources* (the compiled artifacts are deleted by `view:clear`), and `.env` plus `.env.testing` (dotenv is read with `file_get_contents`, which coverage can't see; Laravel falls back to `.env` when `.env.testing` doesn't exist). Also watch any data files the app reads at runtime, such as CSVs or JSON fixtures.
 - `ZEFRAM=0` environment variable disables everything for a run.
 
 Zefram also disables itself automatically when PHPUnit is collecting coverage (`--coverage-*`), since both would contend for pcov and skipped tests would falsify the report.
