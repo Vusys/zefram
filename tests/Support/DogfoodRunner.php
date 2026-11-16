@@ -48,9 +48,12 @@ final readonly class DogfoodRunner
         return ChildPhpUnitProcess::pcovAvailable();
     }
 
-    public function run(): ChildRunResult
+    /**
+     * @param  list<string>  $extraArgs  extra child phpunit arguments, e.g. --coverage-text
+     */
+    public function run(array $extraArgs = []): ChildRunResult
     {
-        return (new ChildPhpUnitProcess)->run($this->root, $this->root.'/phpunit.xml');
+        return (new ChildPhpUnitProcess)->run($this->root, $this->root.'/phpunit.xml', $extraArgs);
     }
 
     /**
