@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vusys\Zefram\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Vusys\Zefram\Attribute\NeverSkip;
 use Vusys\Zefram\Config;
@@ -189,6 +190,29 @@ final class EngineTest extends TestCase
         $engine->finish();
 
         $this->assertFalse($this->engine()->shouldSkip($class, 'testVolatile', ''));
+    }
+
+    /**
+     * @return iterable<string, array{class-string}>
+     */
+    public static function outOfProcessBrowserBases(): iterable
+    {
+        foreach (Engine::OUT_OF_PROCESS_BROWSER_BASES as $index => $base) {
+            yield $base => [BrowserBaseStubs::stubFor($index, $base)];
+        }
+    }
+
+    #[DataProvider('outOfProcessBrowserBases')]
+    public function test_out_of_process_browser_tests_are_never_skipped(string $class): void
+    {
+        $engine = $this->engine();
+        $engine->shouldSkip($class, 'testChart', '');
+        $engine->startCapture($class, 'testChart', '');
+        $engine->stopCapture();
+        $engine->recordPassed($class, 'testChart', '');
+        $engine->finish();
+
+        $this->assertFalse($this->engine()->shouldSkip($class, 'testChart', ''));
     }
 
     public function test_summary_reports_skips(): void
@@ -388,3 +412,41 @@ final class EngineTest extends TestCase
 
 #[NeverSkip]
 final class NeverSkipFixture {}
+
+/**
+ * Each known browser base gets its own stub base class, aliased to that base's name, and its
+ * own test class extending it, so every entry in the list is checked on its own.
+ */
+final class BrowserBaseStubs
+{
+    /**
+     * @return class-string
+     */
+    public static function stubFor(int $index, string $base): string
+    {
+        $bases = [BrowserBaseStub0::class, BrowserBaseStub1::class, BrowserBaseStub2::class, BrowserBaseStub3::class];
+        $tests = [BrowserTestStub0::class, BrowserTestStub1::class, BrowserTestStub2::class, BrowserTestStub3::class];
+
+        if (! class_exists($base, false)) {
+            class_alias($bases[$index], $base);
+        }
+
+        return $tests[$index];
+    }
+}
+
+abstract class BrowserBaseStub0 {}
+
+abstract class BrowserBaseStub1 {}
+
+abstract class BrowserBaseStub2 {}
+
+abstract class BrowserBaseStub3 {}
+
+final class BrowserTestStub0 extends BrowserBaseStub0 {}
+
+final class BrowserTestStub1 extends BrowserBaseStub1 {}
+
+final class BrowserTestStub2 extends BrowserBaseStub2 {}
+
+final class BrowserTestStub3 extends BrowserBaseStub3 {}

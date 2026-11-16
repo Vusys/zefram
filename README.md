@@ -92,6 +92,21 @@ Coverage-as-critical-path is a heuristic. It cannot see env vars, time, randomne
 
 Zefram also disables itself automatically when PHPUnit is collecting coverage (`--coverage-*`), since both would contend for pcov and skipped tests would falsify the report.
 
+### Browser tests against a served app
+
+Browser tests that drive a separately served copy of the app aren't safe to skip. The
+controllers, middleware and views that answer the browser's requests run in the server
+process, which pcov in the test process never sees, so a change to them wouldn't invalidate
+the test. Zefram never skips a test extending a known base of this kind:
+
+- `Vusys\Tetryon\PHPUnit\BrowserTestCase` and `Vusys\Tetryon\Laravel\BrowserTestCase`
+- `Laravel\Dusk\TestCase`
+- `Symfony\Component\Panther\PantherTestCase`
+
+For other out-of-process browser tests, add `neverSkip` for them
+(`<parameter name="neverSkip" value="Tests\Browser\*"/>`), or leave the extension out of the
+browser suite's PHPUnit config.
+
 ### Finding NeverSkip candidates automatically
 
 Rather than discovering a blind spot the hard way (a false skip in production), opt into
