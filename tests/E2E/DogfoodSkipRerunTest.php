@@ -66,6 +66,30 @@ final class DogfoodSkipRerunTest extends TestCase
     }
 
     /**
+     * PHPUnit collecting its own coverage turns zefram off (#61): both would drive pcov, and
+     * skipped tests would falsify the report. Every test runs, and the coverage run leaves
+     * the stored records alone, so the next ordinary run still skips everything.
+     */
+    public function test_a_coverage_run_disables_zefram_and_leaves_its_records_alone(): void
+    {
+        $everyTest = $this->runner->run()->passed();
+        sort($everyTest);
+
+        $coverage = $this->runner->run(['--coverage-text']);
+
+        $this->assertSame(0, $coverage->exitCode, $coverage->stdout.$coverage->stderr);
+        $this->assertSame([], $coverage->skipped(), 'a coverage run must not skip anything');
+        $this->assertSame($everyTest, $coverage->passed());
+        $this->assertStringNotContainsString('Zefram: skipped', $coverage->stdout);
+        $this->assertStringContainsString('Code Coverage Report', $coverage->stdout);
+
+        $rerun = $this->runner->run();
+        $skipped = $rerun->skipped();
+        sort($skipped);
+        $this->assertSame($everyTest, $skipped, 'the coverage run must not have touched the stored records');
+    }
+
+    /**
      * Mutating a shared, widely-depended-on file (FileHasher.php: used directly by
      * FileHasherTest, and transitively by EngineTest through Engine) must rerun exactly the
      * tests recorded against it — determined from the cold run's own real coverage output,
