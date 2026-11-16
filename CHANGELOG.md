@@ -50,6 +50,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Two PHPUnit configurations sharing a `cacheDirectory` no longer wipe each other's records (#83). A full run pruned every other fingerprint directory under the cache, including one written by a different config. The cache now keeps one subdirectory per configuration file, keyed by its path relative to the project, and pruning stays inside it.
 - pcov loaded with `pcov.enabled=0`, its packaged default, counts as no coverage driver (#83). Zefram used to treat it as available, record nothing and never skip, with no sign why. Now every test runs and the summary says to enable pcov.
 
 [Unreleased]: https://github.com/Vusys/zefram/commits/main

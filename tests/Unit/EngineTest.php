@@ -234,7 +234,7 @@ final class EngineTest extends TestCase
         $hasher = new FileHasher;
 
         // seed a known "last recorded duration" for a test that will be skipped this pass
-        $store = new Store($config->cachePath().'/fp');
+        $store = new Store($config->storePath().'/fp');
         $store->put(self::TEST_CLASS, 'testEngage', new TestRecord(
             files: [
                 'src/WarpCore.php' => $this->mustHash($hasher, $this->project->path('src/WarpCore.php')),
@@ -252,7 +252,7 @@ final class EngineTest extends TestCase
             return $times[$i++] ?? end($times);
         };
 
-        $engine = new Engine($config, $this->driver, new Store($config->cachePath().'/fp'), new FileHasher, 'fp', $clock);
+        $engine = new Engine($config, $this->driver, new Store($config->storePath().'/fp'), new FileHasher, 'fp', $clock);
 
         $this->assertTrue($engine->shouldSkip(self::TEST_CLASS, 'testEngage', ''), 'sanity: the seeded record must actually be skippable');
 
@@ -266,7 +266,7 @@ final class EngineTest extends TestCase
         $clock = static fn (): int => 5_000_000_000; // constant: construction and warpFactor() see the same instant
         $config = new Config(enabled: true, projectRoot: $this->project->root);
 
-        $engine = new Engine($config, $this->driver, new Store($config->cachePath().'/fp'), new FileHasher, 'fp', $clock);
+        $engine = new Engine($config, $this->driver, new Store($config->storePath().'/fp'), new FileHasher, 'fp', $clock);
 
         $this->assertSame(1.0, $engine->warpFactor());
     }
@@ -279,15 +279,50 @@ final class EngineTest extends TestCase
 
     public function test_full_run_prunes_stale_fingerprint_directories_on_finish(): void
     {
-        $this->runAndPass('testEngage'); // populates .zefram/fp on disk
+        $this->runAndPass('testEngage'); // populates .zefram/default/fp on disk
 
         // a stale fingerprint directory left behind by an earlier config change (see #6)
-        $this->project->write('.zefram/stale-fingerprint/tests/placeholder.json', '{}');
+        $this->project->write('.zefram/default/stale-fingerprint/tests/placeholder.json', '{}');
 
         $this->engine(fullRun: true)->finish();
 
-        $this->assertDirectoryDoesNotExist($this->project->path('.zefram/stale-fingerprint'));
-        $this->assertDirectoryExists($this->project->path('.zefram/fp'), 'the current fingerprint must survive its own prune');
+        $this->assertDirectoryDoesNotExist($this->project->path('.zefram/default/stale-fingerprint'));
+        $this->assertDirectoryExists($this->project->path('.zefram/default/fp'), 'the current fingerprint must survive its own prune');
+    }
+
+    /**
+     * Two PHPUnit configs sharing a cacheDirectory (#83): a full run under one must not
+     * prune the other's records, as it did when both lived directly under .zefram/.
+     */
+    public function test_a_full_run_leaves_another_configurations_records_alone(): void
+    {
+        $main = $this->project->path('phpunit.xml');
+        $browser = $this->project->path('phpunit.browser.xml');
+
+        $engine = $this->engine(configurationFile: $main);
+        $engine->shouldSkip(self::TEST_CLASS, 'testEngage', '');
+        $engine->startCapture(self::TEST_CLASS, 'testEngage', '');
+        $engine->stopCapture();
+        $engine->recordPassed(self::TEST_CLASS, 'testEngage', '');
+        $engine->finish();
+
+        $other = $this->engine(fullRun: true, configurationFile: $browser);
+        $other->shouldSkip('App\\Tests\\BrowserTest', 'testChart', '');
+        $other->finish();
+
+        $this->assertTrue($this->engine(configurationFile: $main)->shouldSkip(self::TEST_CLASS, 'testEngage', ''));
+    }
+
+    public function test_the_store_is_keyed_by_the_configuration_file_relative_to_the_project(): void
+    {
+        $here = new Config(enabled: true, projectRoot: '/a/project', configurationFile: '/a/project/phpunit.xml');
+        $there = new Config(enabled: true, projectRoot: '/ci/checkout', configurationFile: '/ci/checkout/phpunit.xml');
+        $browser = new Config(enabled: true, projectRoot: '/a/project', configurationFile: '/a/project/phpunit.browser.xml');
+
+        $this->assertMatchesRegularExpression('#^/a/project/\.zefram/phpunit\.xml-[0-9a-f]{8}$#', $here->storePath());
+        $this->assertSame(basename($here->storePath()), basename($there->storePath()), 'same key in every checkout');
+        $this->assertNotSame(basename($here->storePath()), basename($browser->storePath()));
+        $this->assertSame('/a/project/.zefram/default', (new Config(enabled: true, projectRoot: '/a/project'))->storePath());
     }
 
     public function test_full_run_prunes_records_for_tests_that_no_longer_exist(): void
@@ -381,19 +416,20 @@ final class EngineTest extends TestCase
     /**
      * @param  list<string>  $neverSkip
      */
-    private function engine(bool $enabled = true, array $neverSkip = [], bool $fullRun = false, bool $paratestWorker = false): Engine
+    private function engine(bool $enabled = true, array $neverSkip = [], bool $fullRun = false, bool $paratestWorker = false, ?string $configurationFile = null): Engine
     {
         $config = new Config(
             enabled: $enabled,
             projectRoot: $this->project->root,
             neverSkip: $neverSkip,
+            configurationFile: $configurationFile,
             fullRun: $fullRun,
             paratestWorker: $paratestWorker,
         );
 
         // fresh store + hasher per engine simulates a new process; fixed fingerprint keeps
         // the cache namespace stable across the simulated runs
-        return new Engine($config, $this->driver, new Store($config->cachePath().'/fp'), new FileHasher, 'fp');
+        return new Engine($config, $this->driver, new Store($config->storePath().'/fp'), new FileHasher, 'fp');
     }
 
     /**

@@ -88,7 +88,7 @@ pcov.directory = /path/to/project
 pcov.exclude = "~/vendor/~"
 ```
 
-Add `.zefram/` to `.gitignore`.
+Add `.zefram/` to `.gitignore`. Each PHPUnit configuration file gets its own directory inside it (`.zefram/phpunit.xml-<hash>/`), so suites run from separate configs, such as a browser suite, can share one `cacheDirectory`.
 
 ## Escape hatches
 

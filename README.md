@@ -79,7 +79,7 @@ pcov.directory = /path/to/project
 pcov.exclude = "~/vendor/~"
 ```
 
-Add `.zefram/` to `.gitignore`.
+Add `.zefram/` to `.gitignore`. Each PHPUnit configuration file gets its own directory inside it (`.zefram/phpunit.xml-<hash>/`), so suites run from separate configs, such as a browser suite, can share one `cacheDirectory`.
 
 ## Escape hatches
 
@@ -148,7 +148,7 @@ vendor/bin/zefram stats
 vendor/bin/zefram stats --json
 ```
 
-Reads `.zefram/<fingerprint>/tests/*.json` shards directly — no PHPUnit run
+Reads `.zefram/<config>/<fingerprint>/tests/*.json` shards directly — no PHPUnit run
 involved — and reports the total tracked tests, how many are eligible to
 skip next run, and the aggregate stored duration (the sum of every test's
 last recorded run time — roughly how much wall-clock a full run would

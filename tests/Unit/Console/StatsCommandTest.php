@@ -73,7 +73,7 @@ final class StatsCommandTest extends TestCase
     {
         // simulate a stale fingerprint directory that a real config change left behind —
         // stats must only ever read the *current* fingerprint's shards
-        $store = new Store($this->project->path('.zefram/some-other-stale-fingerprint'));
+        $store = new Store(ProjectConfig::storePath($this->project->root).'/some-other-stale-fingerprint');
         $store->put('App\\Tests\\GammaTest', 'testFour', new TestRecord(['src/G.php' => 'z'], 9.9, TestRecord::RESULT_PASSED));
         $store->flush();
 
@@ -85,7 +85,7 @@ final class StatsCommandTest extends TestCase
     private function populateCurrentFingerprintShards(): void
     {
         $fingerprint = ProjectConfig::currentFingerprint($this->project->root);
-        $store = new Store($this->project->path('.zefram/'.$fingerprint));
+        $store = new Store(ProjectConfig::storePath($this->project->root).'/'.$fingerprint);
         $store->put('App\\Tests\\AlphaTest', 'testOne', new TestRecord(['src/A.php' => 'x'], 0.42, TestRecord::RESULT_PASSED));
         $store->put('App\\Tests\\AlphaTest', 'testTwo', new TestRecord(['src/A.php' => 'x'], 1.5, TestRecord::RESULT_PASSED));
         $store->put('App\\Tests\\BetaTest', 'testThree', new TestRecord(['src/B.php' => 'y'], 0.1, TestRecord::RESULT_PASSED));

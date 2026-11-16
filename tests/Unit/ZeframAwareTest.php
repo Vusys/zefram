@@ -92,7 +92,7 @@ final class ZeframAwareTest extends TestCase
     {
         $config = new Config(enabled: true, projectRoot: $this->project->root);
 
-        return new Engine($config, $this->driver, new Store($config->cachePath().'/fp'), new FileHasher, 'fp');
+        return new Engine($config, $this->driver, new Store($config->storePath().'/fp'), new FileHasher, 'fp');
     }
 }
 
