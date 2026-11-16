@@ -222,7 +222,9 @@ final class Engine
         }
 
         if (! $this->driver->isAvailable()) {
-            return 'Zefram: no coverage driver available (is pcov installed?), all tests ran';
+            return $this->driver->name() === 'pcov'
+                ? 'Zefram: pcov is loaded but disabled, all tests ran (run PHP with -d pcov.enabled=1)'
+                : 'Zefram: no coverage driver available (is pcov installed?), all tests ran';
         }
 
         return sprintf(

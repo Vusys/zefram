@@ -24,8 +24,9 @@ final readonly class ChildPhpUnitProcess
 
     /**
      * @param  list<string>  $extraArgs
+     * @param  list<string>  $phpIni  extra `-d` settings, applied after the pcov defaults
      */
-    public function run(string $cwd, string $configFile, array $extraArgs = []): ChildRunResult
+    public function run(string $cwd, string $configFile, array $extraArgs = [], array $phpIni = []): ChildRunResult
     {
         $outerRoot = dirname(__DIR__, 2);
         $phpunitBinary = $outerRoot.'/vendor/bin/phpunit';
@@ -41,6 +42,7 @@ final readonly class ChildPhpUnitProcess
             '-d', 'pcov.enabled=1',
             '-d', 'pcov.directory='.$cwd,
             '-d', 'pcov.exclude=~/(vendor)/~',
+            ...array_merge(...array_map(static fn (string $ini): array => ['-d', $ini], $phpIni)),
             $phpunitBinary,
             '-c', $configFile,
             '--log-junit', $junitPath,
