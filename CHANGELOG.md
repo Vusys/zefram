@@ -47,6 +47,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (#80): the code serving their requests runs in a process pcov can't see, so their record
   would be incomplete. Other such suites are documented to use `neverSkip`.
 - PHPUnit 13 support (`^11.5 || ^12.0 || ^13.0`), with PHPUnit 13 cells in CI on PHP 8.4.
+- `zeframSkipped()` on the trait, and `UnguardedTearDownRule` in `phpstan-extension.neon` (#87). A test zefram skips never boots the framework, but PHPUnit still runs its `tearDown()`, so cleanup through a facade threw and the skip was reported as an error. `tearDown()` can now return early on `$this->zeframSkipped()`, and the rule flags a `tearDown()` that uses a facade, `$this->app`, `app()`, `resolve()` or `config()` before `parent::tearDown()` without that check.
 
 ### Fixed
 

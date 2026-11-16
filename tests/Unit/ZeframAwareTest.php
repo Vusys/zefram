@@ -55,6 +55,8 @@ final class ZeframAwareTest extends TestCase
         $fixture->exerciseSetUp(); // trait: zeframSetUp() then parent::setUp() -> opens the window on $engine
         $fixture->exerciseAfter(); // #[After]: zeframAfter() -> stopCapture() on the same $engine
 
+        $this->assertFalse($fixture->exerciseZeframSkipped(), 'a test that ran was not skipped by zefram');
+
         // Prove the window genuinely captured files: record the pass through the same engine
         // instance the trait just drove, then ask a *fresh* Engine instance pointed at the
         // same store (simulating a new process) whether that test is now skip-eligible.
@@ -85,6 +87,9 @@ final class ZeframAwareTest extends TestCase
             // After-hooks run for skipped tests too (see #20) — must tolerate the
             // never-opened window without throwing.
             $fixture->exerciseAfter();
+
+            // tearDown() reads this to skip framework cleanup (#87)
+            $this->assertTrue($fixture->exerciseZeframSkipped());
         }
     }
 
@@ -112,5 +117,10 @@ final class ZeframAwareFixture extends TestCase
     public function exerciseAfter(): void
     {
         $this->zeframAfter();
+    }
+
+    public function exerciseZeframSkipped(): bool
+    {
+        return $this->zeframSkipped();
     }
 }

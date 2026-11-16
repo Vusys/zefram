@@ -68,6 +68,24 @@ protected function setUp(): void
 }
 ```
 
+A skipped test never reaches `parent::setUp()`, but PHPUnit still runs its `tearDown()`. If a `tearDown()` cleans up through the framework (a facade, `$this->app`), return early when zefram skipped the test, or it throws "A facade root has not been set":
+
+```php
+protected function tearDown(): void
+{
+    if ($this->zeframSkipped()) {
+        parent::tearDown();
+
+        return;
+    }
+
+    Storage::disk('data')->delete('fixture.csv');
+    parent::tearDown();
+}
+```
+
+Including `vendor/vusys/zefram/phpstan-extension.neon` in your `phpstan.neon` flags an unguarded `tearDown()` like this.
+
 Register the extension in `phpunit.xml`:
 
 ```xml

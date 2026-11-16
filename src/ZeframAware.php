@@ -23,9 +23,25 @@ use PHPUnit\Framework\Attributes\After;
  *         parent::setUp();
  *         // your setup
  *     }
+ *
+ * A test skipped here never reaches parent::setUp(), but PHPUnit still runs tearDown(). If
+ * yours cleans up through the framework (a facade, $this->app), return early on a skip (#87):
+ *
+ *     protected function tearDown(): void
+ *     {
+ *         if ($this->zeframSkipped()) {
+ *             parent::tearDown();
+ *
+ *             return;
+ *         }
+ *         // your cleanup
+ *         parent::tearDown();
+ *     }
  */
 trait ZeframAware
 {
+    private bool $zeframSkipped = false;
+
     protected function setUp(): void
     {
         $this->zeframSetUp();
@@ -40,10 +56,20 @@ trait ZeframAware
     protected function zeframSetUp(): void
     {
         if (Zefram::shouldSkip(static::class, $this->name(), $this->dataName())) {
+            $this->zeframSkipped = true;
             $this->markTestSkipped('Zefram: unchanged since last pass');
         }
 
         Zefram::startCapture(static::class, $this->name(), $this->dataName());
+    }
+
+    /**
+     * True when zefram skipped this test before setUp() could boot anything, so tearDown()
+     * should skip framework cleanup.
+     */
+    protected function zeframSkipped(): bool
+    {
+        return $this->zeframSkipped;
     }
 
     // After-hooks also run for tests skipped from setUp(); stopCapture() tolerates a
