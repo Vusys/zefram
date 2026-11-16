@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-16
+
+First release: skip PHPUnit tests whose executed files are unchanged since they last passed. Beta and pre-1.0.
+
 ### Added
 
 - Core engine (`Engine`, the `Zefram` static facade): records the set of files each PHPUnit
@@ -54,4 +58,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Two PHPUnit configurations sharing a `cacheDirectory` no longer wipe each other's records (#83). A full run pruned every other fingerprint directory under the cache, including one written by a different config. The cache now keeps one subdirectory per configuration file, keyed by its path relative to the project, and pruning stays inside it.
 - pcov loaded with `pcov.enabled=0`, its packaged default, counts as no coverage driver (#83). Zefram used to treat it as available, record nothing and never skip, with no sign why. Now every test runs and the summary says to enable pcov.
 
-[Unreleased]: https://github.com/Vusys/zefram/commits/main
+[Unreleased]: https://github.com/Vusys/zefram/compare/v0.1.0...main
+[0.1.0]: https://github.com/Vusys/zefram/releases/tag/v0.1.0
