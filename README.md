@@ -8,7 +8,7 @@
 
 Tests running faster than light. Zefram records the set of files each PHPUnit test executes and, on later runs, skips any test whose recorded files are all unchanged since it last passed — before your framework boots, before the database refreshes.
 
-> **Status: pre-alpha.** The core engine is unit-tested and the mechanics are validated against a real Laravel 12 app (see the M0 spike: capture overhead ~0.25ms/test, an 11× rerun speedup with a seeder-heavy suite skipped without touching the database). Not yet on Packagist; not yet integrated end-to-end.
+> **Status: beta, pre-1.0.** Tested end-to-end by its own e2e suite (dogfooding its source, a generated dependency graph, and a real testbench Laravel app) and trialled on a 6,029-test Laravel suite under paratest: a 5:20 full run became a 12s unchanged rerun, with no false skips from code coverage can see (see [#15](https://github.com/Vusys/zefram/issues/15)). The configuration can still change before 1.0.
 
 ## How it works
 
@@ -38,7 +38,7 @@ flattering itself.
 composer require --dev vusys/zefram
 ```
 
-Requires PHP ≥ 8.2, PHPUnit ≥ 11.5, and [pcov](https://github.com/krakjoe/pcov) (without it Zefram disables itself and all tests run normally).
+Requires PHP ≥ 8.2, PHPUnit ≥ 11.5, and [pcov](https://github.com/krakjoe/pcov) loaded with `pcov.enabled=1`. Without it, Zefram disables itself, all tests run normally, and the summary line says why.
 
 Add the trait to your base TestCase:
 
@@ -85,7 +85,7 @@ Register the extension in `phpunit.xml`:
     <bootstrap class="Vusys\Zefram\PhpUnit\ZeframExtension">
         <parameter name="enabled" value="true"/>
         <parameter name="cacheDirectory" value=".zefram"/>
-        <parameter name="watchedPaths" value=".env.testing,config/**,database/migrations/**,resources/views/**/*.blade.php"/>
+        <parameter name="watchedPaths" value=".env,.env.testing,config/**,database/migrations/**,resources/views/**/*.blade.php"/>
     </bootstrap>
 </extensions>
 ```
@@ -98,7 +98,26 @@ pcov.directory = /path/to/project
 pcov.exclude = "~/vendor/~"
 ```
 
+Many PHP packages ship pcov with `pcov.enabled = 0`. Rather than editing `php.ini`, you can set it per run in a composer script:
+
+```json
+"scripts": {
+    "test": "@php -d pcov.enabled=1 -d pcov.directory=. -d pcov.exclude=\"~/vendor/~\" vendor/bin/phpunit"
+}
+```
+
 Add `.zefram/` to `.gitignore`. Each PHPUnit configuration file gets its own directory inside it (`.zefram/phpunit.xml-<hash>/`), so suites run from separate configs, such as a browser suite, can share one `cacheDirectory`.
+
+### Laravel checklist
+
+From trialling Zefram on real Laravel apps:
+
+1. Add `ZeframAware` to `tests/TestCase.php`. Laravel's own `TestCase` defines `setUp()`, so if yours overrides it, call `$this->zeframSetUp()` first.
+2. Guard any `tearDown()` that uses a facade or `$this->app` with `$this->zeframSkipped()` (see above). The PHPStan extension finds the unguarded ones.
+3. Watch `.env`, `.env.testing`, `config/**`, `database/migrations/**`, your Blade (or other template) sources, and any data files read at runtime. In the trial, an unwatched `.env` was the only source of false skips.
+4. Enable pcov for the run, with `pcov.directory` at the project root.
+5. Browser tests that drive a served app (Tetryon, Dusk, Panther) run every time; see below. If they have their own PHPUnit config, it can share `.zefram/`.
+6. Tests extending plain `PHPUnit\Framework\TestCase` without the trait always run. That's fine for fast unit tests.
 
 ## Escape hatches
 
@@ -176,7 +195,7 @@ last recorded run time — roughly how much wall-clock a full run would
 recover from skipping). The fingerprint is recomputed the same way a real
 run would right now, so this always reflects your current `composer.lock`/
 `phpunit.xml`/PHP version, not a stale cache from before your last dependency
-bump. `--json` emits the same data as structured JSON, for CI scripting.
+bump. `--json` emits the same data as structured JSON, for CI scripting. It reports on `phpunit.xml` (or `phpunit.xml.dist`) only; other configs' records are kept but not counted.
 
 ### Laravel
 
@@ -269,6 +288,8 @@ of starting fully cold — the fingerprint model already isolates the stale
 entries the restored cache brings along into their own directory, so they're
 harmless, just unused until pruned automatically on the next full run (see
 the CLI section's `clear` command note above for how that pruning works).
+
+If you run several PHPUnit configs (say, a browser suite in `phpunit.browser.xml`), add each to `hashFiles(...)`; they share the cached `.zefram/`, one subdirectory per config.
 
 Under paratest (see Paratest, above), the cache step doesn't need to change —
 `.zefram/` accumulates the same way regardless of how many workers wrote to

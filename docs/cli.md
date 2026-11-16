@@ -23,7 +23,8 @@ stored duration (the sum of every test's last recorded run time — roughly how 
 wall-clock a full run would recover from skipping). The fingerprint is recomputed the same
 way a real run would right now, so this always reflects your current `composer.lock`/
 `phpunit.xml`/PHP version, not a stale cache from before your last dependency bump. `--json`
-emits the same data as structured JSON, for CI scripting.
+emits the same data as structured JSON, for CI scripting. It reports on `phpunit.xml` (or
+`phpunit.xml.dist`) only; other configs' records are kept but not counted.
 
 ## Laravel
 
