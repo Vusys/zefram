@@ -46,5 +46,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Browser tests that drive a separately served app (Tetryon, Dusk, Panther) are never skipped
   (#80): the code serving their requests runs in a process pcov can't see, so their record
   would be incomplete. Other such suites are documented to use `neverSkip`.
+- PHPUnit 13 support (`^11.5 || ^12.0 || ^13.0`), with PHPUnit 13 cells in CI on PHP 8.4.
 
 [Unreleased]: https://github.com/Vusys/zefram/commits/main
