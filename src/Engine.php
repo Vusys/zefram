@@ -18,6 +18,18 @@ final class Engine
 {
     public const VERSION = '0.1.0';
 
+    /**
+     * Base classes of browser tests that drive a separately served copy of the app (#80).
+     * The code serving their requests runs in another process, which pcov here never sees,
+     * so their record would be incomplete: they are never skipped.
+     */
+    public const OUT_OF_PROCESS_BROWSER_BASES = [
+        'Vusys\Tetryon\PHPUnit\BrowserTestCase',
+        'Vusys\Tetryon\Laravel\BrowserTestCase',
+        'Laravel\Dusk\TestCase',
+        'Symfony\Component\Panther\PantherTestCase',
+    ];
+
     /** @var array{class: string, key: string, startedAt: float}|null */
     private ?array $current = null;
 
@@ -319,6 +331,12 @@ final class Engine
 
         if (! class_exists($class)) {
             return false;
+        }
+
+        foreach (self::OUT_OF_PROCESS_BROWSER_BASES as $base) {
+            if (is_a($class, $base, true)) {
+                return true;
+            }
         }
 
         $reflection = new ReflectionClass($class);

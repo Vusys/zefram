@@ -43,5 +43,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `composer test` path.
 - `actions/cache` recipe for persisting `.zefram/` across GitHub Actions runs, documented in
   the README.
+- Browser tests that drive a separately served app (Tetryon, Dusk, Panther) are never skipped
+  (#80): the code serving their requests runs in a process pcov can't see, so their record
+  would be incomplete. Other such suites are documented to use `neverSkip`.
 
 [Unreleased]: https://github.com/Vusys/zefram/commits/main

@@ -40,7 +40,8 @@ final class JUnitReport
 
         foreach ($node->testcase as $case) {
             $class = (string) $case['class'];
-            $method = (string) $case['name'];
+            // "m with data set "x"" / "m with data set #0" -> Engine's "m#x" / "m#0" key
+            $method = (string) preg_replace('/ with data set (?:"(.*)"|#(\d+))$/', '#$1$2', (string) $case['name']);
 
             $status = TestOutcome::PASSED;
 
