@@ -22,7 +22,8 @@ final class PcovDriver implements CoverageDriver
 
     public function isAvailable(): bool
     {
-        return extension_loaded('pcov');
+        // Loaded but pcov.enabled=0 (the packaged default) collects nothing at all (#83).
+        return extension_loaded('pcov') && filter_var(ini_get('pcov.enabled'), FILTER_VALIDATE_BOOL);
     }
 
     public function start(): void

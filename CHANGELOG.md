@@ -48,4 +48,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   would be incomplete. Other such suites are documented to use `neverSkip`.
 - PHPUnit 13 support (`^11.5 || ^12.0 || ^13.0`), with PHPUnit 13 cells in CI on PHP 8.4.
 
+### Fixed
+
+- pcov loaded with `pcov.enabled=0`, its packaged default, counts as no coverage driver (#83). Zefram used to treat it as available, record nothing and never skip, with no sign why. Now every test runs and the summary says to enable pcov.
+
 [Unreleased]: https://github.com/Vusys/zefram/commits/main

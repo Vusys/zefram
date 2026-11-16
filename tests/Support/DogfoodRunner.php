@@ -50,10 +50,11 @@ final readonly class DogfoodRunner
 
     /**
      * @param  list<string>  $extraArgs  extra child phpunit arguments, e.g. --coverage-text
+     * @param  list<string>  $phpIni  extra child `-d` settings, e.g. pcov.enabled=0
      */
-    public function run(array $extraArgs = []): ChildRunResult
+    public function run(array $extraArgs = [], array $phpIni = []): ChildRunResult
     {
-        return (new ChildPhpUnitProcess)->run($this->root, $this->root.'/phpunit.xml', $extraArgs);
+        return (new ChildPhpUnitProcess)->run($this->root, $this->root.'/phpunit.xml', $extraArgs, $phpIni);
     }
 
     /**

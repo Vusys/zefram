@@ -90,6 +90,21 @@ final class DogfoodSkipRerunTest extends TestCase
     }
 
     /**
+     * pcov loaded with pcov.enabled=0 collects nothing (#83). Zefram treats it like a missing
+     * driver: every test runs, nothing is recorded, and the summary says how to fix it.
+     */
+    public function test_pcov_loaded_but_disabled_runs_everything_and_says_so(): void
+    {
+        foreach ([1, 2] as $run) {
+            $result = $this->runner->run(phpIni: ['pcov.enabled=0']);
+
+            $this->assertSame(0, $result->exitCode, $result->stdout.$result->stderr);
+            $this->assertSame([], $result->skipped(), "run {$run} must not skip anything");
+            $this->assertStringContainsString('Zefram: pcov is loaded but disabled, all tests ran', $result->stdout);
+        }
+    }
+
+    /**
      * Mutating a shared, widely-depended-on file (FileHasher.php: used directly by
      * FileHasherTest, and transitively by EngineTest through Engine) must rerun exactly the
      * tests recorded against it — determined from the cold run's own real coverage output,
