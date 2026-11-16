@@ -37,4 +37,30 @@ final readonly class Config
 
         return rtrim($this->projectRoot, '/').'/'.$this->cacheDirectory;
     }
+
+    /**
+     * Where this PHPUnit configuration's fingerprint directories live: one subdirectory
+     * per configuration file, so two configs sharing a cacheDirectory never prune each
+     * other's records (#83).
+     */
+    public function storePath(): string
+    {
+        return $this->cachePath().'/'.self::configKey($this->projectRoot, $this->configurationFile);
+    }
+
+    /**
+     * "<config basename>-<hash>", hashing the path relative to the project root so the key
+     * is the same in every checkout (a CI cache restored into another directory still hits).
+     */
+    public static function configKey(string $projectRoot, ?string $configurationFile): string
+    {
+        if ($configurationFile === null) {
+            return 'default';
+        }
+
+        $root = rtrim($projectRoot, '/').'/';
+        $relative = str_starts_with($configurationFile, $root) ? substr($configurationFile, strlen($root)) : $configurationFile;
+
+        return basename($configurationFile).'-'.substr(hash('xxh128', $relative), 0, 8);
+    }
 }

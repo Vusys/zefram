@@ -9,7 +9,7 @@ use Vusys\Zefram\Console\ProjectConfig;
 use Vusys\Zefram\Store\TestRecord;
 
 /**
- * `zefram stats` — reads .zefram/<fingerprint>/tests/*.json shards directly, no PHPUnit run
+ * `zefram stats` — reads .zefram/<config>/<fingerprint>/tests/*.json shards directly, no PHPUnit run
  * involved. Reports, per #20's storage-format section: total tracked tests, how many are
  * eligible to skip next run (have a passed record under the current fingerprint), and
  * aggregate stored duration — the same underlying number #10's warp factor uses, computed
@@ -40,7 +40,7 @@ final readonly class StatsCommand implements Command
         $eligible = 0;
         $duration = 0.0;
 
-        $shardDirectory = ProjectConfig::cachePath($this->projectRoot).'/'.$fingerprint.'/tests';
+        $shardDirectory = ProjectConfig::storePath($this->projectRoot).'/'.$fingerprint.'/tests';
 
         foreach (glob($shardDirectory.'/*.json') ?: [] as $shardFile) {
             $decoded = json_decode((string) file_get_contents($shardFile), true);

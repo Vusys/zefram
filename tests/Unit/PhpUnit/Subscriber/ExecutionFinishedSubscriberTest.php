@@ -91,7 +91,7 @@ final class ExecutionFinishedSubscriberTest extends TestCase
             paratestWorker: $paratestWorker,
         );
 
-        return new Engine($config, $driver ?? new FakeDriver, new Store($config->cachePath().'/fp'), new FileHasher, 'fp');
+        return new Engine($config, $driver ?? new FakeDriver, new Store($config->storePath().'/fp'), new FileHasher, 'fp');
     }
 
     /**

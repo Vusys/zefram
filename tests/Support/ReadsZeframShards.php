@@ -21,7 +21,7 @@ trait ReadsZeframShards
     {
         $records = [];
 
-        foreach (glob($this->cacheRoot().'/.zefram/*/tests/*.json') ?: [] as $shardFile) {
+        foreach (glob($this->cacheRoot().'/.zefram/*/*/tests/*.json') ?: [] as $shardFile) {
             $decoded = json_decode((string) file_get_contents($shardFile), true);
             if (! is_array($decoded)) {
                 continue;

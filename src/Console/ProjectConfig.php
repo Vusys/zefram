@@ -93,9 +93,17 @@ final class ProjectConfig
         return Fingerprint::compute($config, $driverName, Engine::VERSION, new FileHasher);
     }
 
+    /**
+     * Mirrors Config::storePath(): the default configuration file's directory under the cache.
+     */
+    public static function storePath(string $projectRoot): string
+    {
+        return rtrim(self::cachePath($projectRoot), '/').'/'.Config::configKey($projectRoot, self::configurationFile($projectRoot));
+    }
+
     public static function currentFingerprintPath(string $projectRoot): string
     {
-        return rtrim(self::cachePath($projectRoot), '/').'/'.self::currentFingerprint($projectRoot);
+        return self::storePath($projectRoot).'/'.self::currentFingerprint($projectRoot);
     }
 
     private static function parameter(string $projectRoot, string $name): ?string

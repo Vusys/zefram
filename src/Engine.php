@@ -89,7 +89,7 @@ final class Engine
         $driver ??= extension_loaded('pcov') ? new PcovDriver : new NullDriver;
         $hasher = new FileHasher;
         $fingerprint = Fingerprint::compute($config, $driver->name(), self::VERSION, $hasher);
-        $store = new Store($config->cachePath().'/'.$fingerprint);
+        $store = new Store($config->storePath().'/'.$fingerprint);
 
         return new self($config, $driver, $store, $hasher, $fingerprint);
     }
@@ -214,7 +214,7 @@ final class Engine
         $this->store->flush();
 
         if ($fullRun) {
-            Store::pruneSiblings($this->config->cachePath(), $this->fingerprint);
+            Store::pruneSiblings($this->config->storePath(), $this->fingerprint);
         }
 
         if (! $this->config->enabled || $this->testsSeen === 0) {

@@ -17,7 +17,7 @@ vendor/bin/zefram stats
 vendor/bin/zefram stats --json
 ```
 
-Reads `.zefram/<fingerprint>/tests/*.json` shards directly — no PHPUnit run involved — and
+Reads `.zefram/<config>/<fingerprint>/tests/*.json` shards directly — no PHPUnit run involved — and
 reports the total tracked tests, how many are eligible to skip next run, and the aggregate
 stored duration (the sum of every test's last recorded run time — roughly how much
 wall-clock a full run would recover from skipping). The fingerprint is recomputed the same
