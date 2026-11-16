@@ -59,6 +59,24 @@ protected function setUp(): void
 }
 ```
 
+A skipped test never reaches `parent::setUp()`, but PHPUnit still runs its `tearDown()`. If a `tearDown()` cleans up through the framework (a facade, `$this->app`), return early when zefram skipped the test, or it throws "A facade root has not been set":
+
+```php
+protected function tearDown(): void
+{
+    if ($this->zeframSkipped()) {
+        parent::tearDown();
+
+        return;
+    }
+
+    Storage::disk('data')->delete('fixture.csv');
+    parent::tearDown();
+}
+```
+
+The PHPStan extension (see below) flags an unguarded `tearDown()` like this.
+
 Register the extension in `phpunit.xml`:
 
 ```xml
@@ -113,7 +131,9 @@ Rather than discovering a blind spot the hard way (a false skip in production), 
 `Vusys\Zefram\PHPStan\NeverSkipCandidateRule` — a PHPStan rule that flags test methods
 calling known non-deterministic/runtime-only things (`rand()`, `time()`, `now()`, an un-faked
 `Http::` call, raw `curl_exec()`, ...) without a `#[NeverSkip]` attribute already neutralizing
-them. Add to your own `phpstan.neon`:
+them. The same extension also loads `Vusys\Zefram\PHPStan\UnguardedTearDownRule`, which flags a
+`tearDown()` that uses the framework before `parent::tearDown()` without checking
+`$this->zeframSkipped()`. Add to your own `phpstan.neon`:
 
 ```neon
 includes:
